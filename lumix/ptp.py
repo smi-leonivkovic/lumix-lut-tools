@@ -20,7 +20,7 @@ VID = 0x04DA
 KNOWN_PRODUCTS = {0x2382: 'PC (Tether)', 0x2387: 'LUMIX Lab'}
 FORBIDDEN_OPS = {0x9606, 0x9607}  # LumixSendDataInfo / LumixSendData: firmware update channel
 STD_PROP_OPS = {0x1014, 0x1015, 0x1016}  # standard Get/SetDevicePropDesc/Value
-STD_PROPS_OK = {0x5001}  # the only standard property a DC-S9 lists; 0x500E got no answer (link unresponsive until replug)
+STD_PROPS_OK = {0x5001}  # the only standard property a DC-S9 lists; unlisted ones (e.g. 0x500E) get no answer
 OK = 0x2001
 LOCK = threading.RLock()
 
@@ -79,6 +79,7 @@ class Camera:
         except usb.core.USBError:
             pass
         intf = self.dev.get_active_configuration()[(0, 0)]
+        self.intf_no = intf.bInterfaceNumber
         for attempt in range(8):
             try:
                 usb.util.claim_interface(self.dev, intf.bInterfaceNumber)
@@ -105,26 +106,87 @@ class Camera:
         if code in FORBIDDEN_OPS:
             raise CameraError(f'Operation 0x{code:04x} is the firmware channel and is blocked.')
         if code in STD_PROP_OPS and (not params or params[0] not in STD_PROPS_OK):
-            warnings.warn('Standard PTP property 0x%04x is not listed by the camera; on a DC-S9 such a request got no '
-                          'answer and the USB link stayed unresponsive until replug.' % (params[0] if params else 0),
+            warnings.warn('Standard PTP property 0x%04x is not listed by the camera; a DC-S9 does not answer it '
+                          '(the link is recovered automatically after the timeout).' % (params[0] if params else 0),
                           RuntimeWarning, stacklevel=2)
         self.tid += 1
-        self.out.write(struct.pack('<IHHI', 12 + 4 * len(params), 1, code, self.tid)
-                       + b''.join(struct.pack('<I', p) for p in params), timeout=5000)
-        if data is not None:
-            self.out.write(struct.pack('<IHHI', 12 + len(data), 2, code, self.tid) + data, timeout=timeout)
-        got = b''
-        while True:
-            buf = bytes(self.inp.read(1 << 20, timeout=timeout))
-            length = struct.unpack('<I', buf[:4])[0]
-            while len(buf) < length:
-                buf += bytes(self.inp.read(1 << 20, timeout=timeout))
-            typ, rc = struct.unpack('<HH', buf[4:8])
-            if typ == 2:
-                got += buf[12:length]
-            elif typ == 3:
-                n = (length - 12) // 4
-                return rc, list(struct.unpack(f'<{n}I', buf[12:12 + 4 * n])), got
+        try:
+            self.out.write(struct.pack('<IHHI', 12 + 4 * len(params), 1, code, self.tid)
+                           + b''.join(struct.pack('<I', p) for p in params), timeout=5000)
+            if data is not None:
+                self.out.write(struct.pack('<IHHI', 12 + len(data), 2, code, self.tid) + data, timeout=timeout)
+            got = b''
+            while True:
+                buf = bytes(self.inp.read(1 << 20, timeout=timeout))
+                length = struct.unpack('<I', buf[:4])[0]
+                while len(buf) < length:
+                    buf += bytes(self.inp.read(1 << 20, timeout=timeout))
+                typ, rc = struct.unpack('<HH', buf[4:8])
+                if typ == 2:
+                    got += buf[12:length]
+                elif typ == 3:
+                    n = (length - 12) // 4
+                    return rc, list(struct.unpack(f'<{n}I', buf[12:12 + 4 * n])), got
+        except usb.core.USBTimeoutError:
+            step = self.recover()
+            raise CameraError(f'No answer to operation 0x{code:04x}. USB link recovered by: {step}.'
+                              if step else f'No answer to operation 0x{code:04x}; recovery failed, replug the camera.')
+
+    # PTP-over-USB (Still Image class) control requests
+    def _status(self):
+        try:
+            d = bytes(self.dev.ctrl_transfer(0xA1, 0x67, 0, self.intf_no, 20, timeout=2000))  # Get Device Status
+            return struct.unpack('<H', d[2:4])[0] if len(d) >= 4 else None
+        except usb.core.USBError:
+            return None
+
+    def _alive(self):
+        """True if the camera answers GetDeviceInfo again (fresh transaction id)."""
+        try:
+            self.tid += 1
+            self.out.write(struct.pack('<IHHI', 12, 1, 0x1001, self.tid), timeout=3000)
+            for _ in range(4):
+                buf = bytes(self.inp.read(1 << 20, timeout=3000))
+                if len(buf) >= 8 and struct.unpack('<H', buf[4:6])[0] == 3:
+                    return True
+        except usb.core.USBError:
+            pass
+        return False
+
+    def _drain(self):
+        for _ in range(8):
+            try:
+                self.inp.read(1 << 20, timeout=300)
+            except usb.core.USBError:
+                return
+
+    def recover(self):
+        """Escalate: cancel request -> device reset request -> USB port reset. Returns the step that worked."""
+        steps = [
+            ('cancel request', lambda: self.dev.ctrl_transfer(0x21, 0x64, 0, self.intf_no, struct.pack('<HI', 0x4001, self.tid), 2000)),
+            ('device reset request', lambda: self.dev.ctrl_transfer(0x21, 0x66, 0, self.intf_no, None, 2000)),
+            ('clear endpoint halts', lambda: (self.dev.clear_halt(self.out), self.dev.clear_halt(self.inp))),
+        ]
+        for name, fn in steps:
+            try:
+                fn()
+            except usb.core.USBError:
+                pass
+            for _ in range(10):
+                if self._status() in (OK, None):
+                    break
+                time.sleep(0.2)
+            self._drain()
+            if self._alive():
+                return name
+        try:  # last resort: port reset, then a fresh session
+            self.dev.reset()
+            time.sleep(1.5)
+            usb.util.dispose_resources(self.dev)
+            self.open()
+            return 'USB port reset'
+        except Exception:
+            return None
 
     def close(self):
         if self.dev is None:

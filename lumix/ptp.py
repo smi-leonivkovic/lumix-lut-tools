@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+import warnings
 
 import usb.backend.libusb1
 import usb.core
@@ -104,8 +105,8 @@ class Camera:
         if code in FORBIDDEN_OPS:
             raise CameraError(f'Operation 0x{code:04x} is the firmware channel and is blocked.')
         if code in STD_PROP_OPS and (not params or params[0] not in STD_PROPS_OK):
-            raise CameraError('Standard PTP property 0x%04x is not listed by the camera; asking for it hangs a DC-S9 '
-                              '(replug needed). Use the Panasonic properties in lumix.settings.' % (params[0] if params else 0))
+            warnings.warn('Standard PTP property 0x%04x is not listed by the camera; on a DC-S9 this request hung the '
+                          'USB connection until replug.' % (params[0] if params else 0), RuntimeWarning, stacklevel=2)
         self.tid += 1
         self.out.write(struct.pack('<IHHI', 12 + 4 * len(params), 1, code, self.tid)
                        + b''.join(struct.pack('<I', p) for p in params), timeout=5000)

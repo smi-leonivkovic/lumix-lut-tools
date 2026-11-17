@@ -27,7 +27,7 @@ What we learned building this, including the mistakes, so nobody has to repeat t
 - Firmware 2.1 exposes ~37 more readable properties than 1.5 (0x02000210–0x0200022A and others).
 - **Don't use standard PTP property ops (0x1014/0x1015/0x1016) for properties the camera doesn't list** (DeviceInfo
   lists only 0x5001 battery): GetDevicePropValue 0x500E (ExposureProgramMode) hung the S9's USB stack until replug.
-  `lumix/ptp.py` refuses them.
+  `lumix/ptp.py` warns before sending them.
 - **P/A/S/M can't be set over USB.** libgphoto2's `expmode` (0x06000011) is the movie exposure mode; LUMIX Lab has no
   photo exposure-mode setter either. 0x9918 LumixControlCameraMode switches shooting (1) vs gallery/LUT management (2).
 - macOS `ptpcamerad` re-grabs the camera between calls; claim the interface with retries. If a transfer is interrupted

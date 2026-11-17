@@ -62,7 +62,10 @@ What we learned building this, including the mistakes, so nobody has to repeat t
 - Grain strengths: L1–33 Low, L34–66 Standard, L67–100 High; no size control. L20 was hard to see, L50–60 clear,
   L85 strong. Maker note `MonochromeGrainEffect`: 1/2/3 = Low/Standard/High, 4/5/6 = the same with colour noise.
 - More Rec properties found by testing (tether mode): 0x020001F2 colour noise on/off, 0x020001F3 LUT 1 on/off,
-  0x020001F9 LUT opacity (10–100). 0x020001FB accepts writes but didn't change the active LUT.
+  0x020001F9 LUT opacity (10–100).
+- **Active LUT selection is not exposed over PTP** (as far as tested): switching the LUT on the camera changes none of
+  the single properties nor the 0x020001F0/0x02000220/0x02000010 blocks; writing 0x020001FB (alone or inside the
+  My Photo Style edit session 0x9419 StartEdit/EndEdit) is accepted but ignored. Next step would be recording LUMIX Lab.
 - LUT upload/rename/sort/delete also work in **PC (Tether)** USB mode (04da:2382); no need to switch to LUMIX Lab mode.
   In tether mode GetLutInfo records are **262 bytes** (id, name, style, type) instead of 272 (no grain/noise/visibility
   fields); the parser detects it from the size field.

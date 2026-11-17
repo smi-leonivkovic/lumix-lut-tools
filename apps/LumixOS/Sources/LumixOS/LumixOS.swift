@@ -138,6 +138,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 final class LiveStream: NSObject, ObservableObject, URLSessionDataDelegate {
     @Published var image: CGImage?
+    @Published var peakImage: CGImage?  // focus peaking overlay for `image`
+    private let peaking = Peaking()
+    private var peakSettings: (Float, PeakColor)?  // guarded by lock
+    func setPeaking(_ level: PeakLevel, _ color: PeakColor) {
+        lock.lock(); peakSettings = level.threshold.map { ($0, color) }; lock.unlock()
+        if level == .off { peakImage = nil }
+    }
     @Published var displayFPS: Double = 0
     @Published var lastFrameAt: Date?
     private var buffer = Data()
@@ -194,8 +201,11 @@ final class LiveStream: NSObject, ObservableObject, URLSessionDataDelegate {
             self.lock.lock(); self.decoding = false; self.lock.unlock()
             guard let img else { return }  // broken JPEG: skip it
             self.onFrame?(img)
+            self.lock.lock(); let ps = self.peakSettings; self.lock.unlock()
+            let peak = ps.flatMap { self.peaking.overlay(img, threshold: $0.0, color: $0.1) }
             DispatchQueue.main.async {
                 self.image = img
+                self.peakImage = peak
                 self.lastFrameAt = Date()
                 self.tick()
             }
@@ -292,12 +302,27 @@ final class CameraModel: ObservableObject {
     }
 
     func set(_ key: String, _ label: String) {
+        if key == "focus_mode" && label != "MF" { mfAssistEnd() }
         state?.current[key] = label  // optimistic: the HUD follows at once, the next poll corrects it
         post("set", ["key": key, "label": label])
     }
 
     func focus(_ step: String, ms: Int = 150) {
         post("focus", ["step": step, "ms": ms], quiet: true)
+    }
+
+    @Published var mfAssist = false
+
+    /// MF assist (camera's magnified view) at (x, y) in 0..1000; mode 2 = magnify (verified on a DC-S9).
+    func mfAssistStart(x: Double, y: Double) {
+        mfAssist = true
+        post("mfassist", ["action": "start", "x": Int(x.rounded()), "y": Int(y.rounded()), "mode": 2], quiet: true)
+    }
+
+    func mfAssistEnd() {
+        guard mfAssist else { return }
+        mfAssist = false
+        post("mfassist", ["action": "end"], quiet: true)
     }
 
     /// Touch AF: move the AF area to (x, y) in 0..1000 and focus there.
@@ -727,7 +752,10 @@ struct AFPointBox: View {
     }
 }
 
-/// Virtual MF ring: drag up = far, down = near; faster drags drive faster. Grabbing it in AF switches to MF.
+let dialOrange = Color(red: 0.98, green: 0.62, blue: 0.32)
+
+/// MF dial in the style of the iOS timer dial: orange ticks scroll under a fixed pointer. Drag up = far, down = near;
+/// faster drags drive faster. Grabbing it in AF switches to MF; the MF pill toggles MF / AFC.
 struct FocusRing: View {
     let fs: CGFloat
     let height: CGFloat
@@ -736,49 +764,77 @@ struct FocusRing: View {
     @State private var lastY: CGFloat?
     @State private var pending: CGFloat = 0
     @State private var lastSend = Date.distantPast
+    @State private var lastMajor = 0
     @State private var grabbed = false
 
     var isMF: Bool { camera.state?.current["focus_mode"] == "MF" }
+    var gap: CGFloat { max(6, fs * 0.5) }
 
     var body: some View {
-        let w = fs * 2.1
-        VStack(spacing: fs * 0.35) {
-            Text("∞").font(.system(size: fs * 0.8, weight: .bold, design: .rounded))
-            ring(width: w)
-            Text("NEAR").font(.system(size: fs * 0.5, weight: .heavy, design: .rounded))
-            Text("MF").font(.system(size: fs * 0.55, weight: .heavy, design: .rounded))
-                .padding(.horizontal, 4).padding(.vertical, 1)
-                .overlay(RoundedRectangle(cornerRadius: 2).stroke(lineWidth: 1.1))
-                .opacity(isMF ? 1 : 0.45)
+        let w = fs * 3.1
+        VStack(spacing: fs * 0.5) {
+            VStack(spacing: fs * 0.25) {
+                Text("∞").font(.system(size: fs * 0.85, weight: .semibold, design: .rounded))
+                    .foregroundStyle(dialOrange.opacity(0.9))
+                dial(width: w)
+                Text("NEAR").font(.system(size: fs * 0.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(dialOrange.opacity(0.9))
+            }
+            .padding(.vertical, fs * 0.6)
+            .padding(.horizontal, fs * 0.35)
+            .background(Color.black.opacity(0.92), in: RoundedRectangle(cornerRadius: fs * 1.3, style: .continuous))
+            .shadow(color: .black.opacity(0.35), radius: 8, y: 2)
+
+            Button {
+                camera.set("focus_mode", isMF ? "AFC" : "MF")
+            } label: {
+                Text("MF")
+                    .font(.system(size: fs * 0.72, weight: .semibold, design: .rounded))
+                    .foregroundStyle(isMF ? dialOrange : dialOrange.opacity(0.55))
+                    .padding(.horizontal, fs * 0.8).padding(.vertical, fs * 0.3)
+                    .background(dialOrange.opacity(isMF ? 0.22 : 0.08), in: Capsule())
+                    .background(Color.black.opacity(0.85), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .help(isMF ? "Back to AFC" : "Manual focus")
         }
-        .foregroundStyle(.white)
-        .shadow(color: .black.opacity(0.8), radius: 1)
-        .help("MF ring: drag up for far, down for near (faster = faster). Grabbing it switches the camera to MF. "
+        .help("MF dial: drag up for far, down for near (faster = faster). Grabbing it switches the camera to MF. "
               + "Also [ ] keys ({ } fast) and the scroll wheel.")
     }
 
-    func ring(width w: CGFloat) -> some View {
-        let gap = max(5, fs * 0.38)
-        return Canvas { ctx, size in
-            var y = phase.truncatingRemainder(dividingBy: gap)
-            if y < 0 { y += gap }
-            while y < size.height {
-                let t = y / size.height  // cylinder shading: ridges fade and thin towards the ends
-                let shade = sin(t * .pi)
-                var p = Path()
-                p.move(to: CGPoint(x: w * 0.18, y: y)); p.addLine(to: CGPoint(x: w * 0.82, y: y))
-                ctx.stroke(p, with: .color(.white.opacity(0.15 + 0.55 * shade)), lineWidth: 0.8 + 1.4 * shade)
-                y += gap
+    func dial(width w: CGFloat) -> some View {
+        let g = gap
+        return ZStack(alignment: .leading) {
+            Canvas { ctx, size in
+                let first = Int(floor(-phase / g)) - 1
+                var i = first
+                while true {
+                    let y = phase + CGFloat(i) * g
+                    if y > size.height + g { break }
+                    if y >= -g {
+                        let major = i % 5 == 0
+                        let len = major ? size.width * 0.62 : size.width * 0.42
+                        var p = Path()
+                        p.move(to: CGPoint(x: size.width - len, y: y)); p.addLine(to: CGPoint(x: size.width - 4, y: y))
+                        ctx.stroke(p, with: .color(dialOrange.opacity(major ? 1 : 0.7)),
+                                   style: StrokeStyle(lineWidth: major ? 3 : 2.2, lineCap: .round))
+                    }
+                    i += 1
+                }
             }
+            .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.28),
+                                         .init(color: .black, location: 0.72), .init(color: .clear, location: 1)],
+                                 startPoint: .top, endPoint: .bottom))
+            // fixed pointer
+            Triangle()
+                .fill(dialOrange)
+                .frame(width: fs * 0.55, height: fs * 0.6)
+                .offset(x: 1)
         }
         .frame(width: w, height: height)
-        .overlay(LinearGradient(colors: [.black.opacity(0.45), .clear, .clear, .black.opacity(0.45)],
-                                startPoint: .top, endPoint: .bottom).allowsHitTesting(false))
-        .clipShape(Capsule())
-        .glass(Capsule(), tint: grabbed ? panasonicYellow.opacity(0.3) : nil, interactive: true)
-        .scaleEffect(grabbed ? 1.04 : 1)
+        .scaleEffect(grabbed ? 1.03 : 1)
         .animation(.spring(response: 0.25, dampingFraction: 0.75), value: grabbed)
-        .contentShape(Capsule())
+        .contentShape(Rectangle())
         .gesture(DragGesture(minimumDistance: 0)
             .onChanged { v in
                 if !grabbed {
@@ -790,6 +846,11 @@ struct FocusRing: View {
                 lastY = y
                 phase += dy
                 pending += dy
+                let major = Int(floor(phase / (g * 5)))
+                if major != lastMajor {
+                    lastMajor = major
+                    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                }
                 let dt = Date().timeIntervalSince(lastSend)
                 if dt > 0.07, abs(pending) >= 1 {
                     let speed = abs(pending) / CGFloat(min(dt, 0.25))  // points per second
@@ -808,7 +869,56 @@ struct FocusRing: View {
     }
 }
 
+/// Pointer pointing right (into the dial).
+struct Triangle: Shape {
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: r.minX, y: r.minY))
+        p.addLine(to: CGPoint(x: r.maxX, y: r.midY))
+        p.addLine(to: CGPoint(x: r.minX, y: r.maxY))
+        p.closeSubpath()
+        return p
+    }
+}
+
 // MARK: - Window
+
+/// Frosted, see-through window like a frosted Ghostty window (background-opacity 0.88, background-blur 20,
+/// Kanagawa Dragon #181616): behind-window blur + tinted fill; title bar blends into the content.
+struct FrostedWindow: NSViewRepresentable {
+    static let tint = NSColor(srgbRed: 0x18 / 255, green: 0x16 / 255, blue: 0x16 / 255, alpha: 0.80)
+
+    func makeNSView(context: Context) -> NSView {
+        let blur = NSVisualEffectView()
+        blur.blendingMode = .behindWindow
+        blur.material = .underWindowBackground
+        blur.state = .active
+        let tint = NSView()
+        tint.wantsLayer = true
+        tint.layer?.backgroundColor = Self.tint.cgColor
+        tint.autoresizingMask = [.width, .height]
+        blur.addSubview(tint)
+        DispatchQueue.main.async {
+            guard let w = blur.window else { return }
+            w.isOpaque = false
+            w.backgroundColor = .clear
+            w.titlebarAppearsTransparent = true
+            w.styleMask.insert(.fullSizeContentView)
+            w.appearance = NSAppearance(named: .darkAqua)  // camera UI stays dark
+        }
+        return blur
+    }
+
+    func updateNSView(_ v: NSView, context: Context) {
+        v.subviews.first?.frame = v.bounds
+    }
+}
+
+extension View {
+    @ViewBuilder func hiddenToolbarBackground() -> some View {
+        if #available(macOS 15.0, *) { self.toolbarBackground(.hidden, for: .windowToolbar) } else { self }
+    }
+}
 
 let settingOrder: [(String, String)] = [
     ("photo_style", "Photo Style"), ("lut1_opacity", "LUT opacity"), ("white_balance", "White balance"),
@@ -824,6 +934,8 @@ struct ContentView: View {
     @State var showGrid = true
     @State var showLevel = true
     @State var showHistogram = false
+    @AppStorage("peakLevel") var peakLevel = PeakLevel.off
+    @AppStorage("peakColor") var peakColor = PeakColor.red
     @StateObject var hover = HoverMenu()
     @State var lastScroll = Date.distantPast
     @State var touchPoint: CGPoint?  // last touch AF point, 0..1 of the picture
@@ -843,7 +955,7 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 560, minHeight: 440)
-        .background(Color.black)
+        .background(FrostedWindow().ignoresSafeArea())
         .onAppear {
             stream.onFrame = { obsFeed.send($0) }
             obsFeed.onStatus = { error, running in
@@ -857,6 +969,7 @@ struct ContentView: View {
             stream.connect()
             camera.startPolling()
             if UserDefaults.standard.bool(forKey: "obsFeed") { obsFeed.start() }
+            stream.setPeaking(peakLevel, peakColor)
         }
         .background(KeyCatcher(onKey: key, onScroll: scroll))
         .toolbar {
@@ -864,10 +977,22 @@ struct ContentView: View {
                 Toggle(isOn: $showGrid) { Image(systemName: "grid") }.help("Grid (g)")
                 Toggle(isOn: $showLevel) { Image(systemName: "level") }.help("Level (l)")
                 Toggle(isOn: $showHistogram) { Image(systemName: "chart.bar") }.help("Histogram (h)")
+                Menu {
+                    Picker("Peaking", selection: $peakLevel) { ForEach(PeakLevel.allCases) { Text($0.rawValue).tag($0) } }
+                        .pickerStyle(.inline)
+                    Picker("Colour", selection: $peakColor) { ForEach(PeakColor.allCases) { Text($0.rawValue).tag($0) } }
+                        .pickerStyle(.inline)
+                } label: {
+                    Image(systemName: peakLevel == .off ? "scope" : "scope").symbolVariant(peakLevel == .off ? .none : .fill)
+                }
+                .help("Focus peaking (p)")
                 Toggle(isOn: $showPanel) { Image(systemName: "sidebar.right") }.help("Settings panel (s)")
             }
         }
+        .onChange(of: peakLevel) { _, v in stream.setPeaking(v, peakColor) }
+        .onChange(of: peakColor) { _, v in stream.setPeaking(peakLevel, v) }
         .navigationTitle(camera.state?.camera.map { "LumixOS — \($0.model)" } ?? "LumixOS")
+        .hiddenToolbarBackground()
     }
 
     /// What's wrong right now, worst first; nil when the picture is live.
@@ -892,7 +1017,7 @@ struct ContentView: View {
                     ? CGSize(width: g.size.height * aspect, height: g.size.height)
                     : CGSize(width: g.size.width, height: g.size.width / aspect)
                 ZStack {
-                    Color.black
+                    Color.clear
                     ZStack {
                         if let img = stream.image {
                             Image(decorative: img, scale: 1).resizable().interpolation(.medium)
@@ -903,6 +1028,11 @@ struct ContentView: View {
                                     guard problem == nil else { return }
                                     hover.close()
                                     let n = CGPoint(x: p.x / fit.width, y: p.y / fit.height)
+                                    if camera.state?.current["focus_mode"] == "MF" {
+                                        // MF: click opens the magnified MF assist there, the next click closes it
+                                        if camera.mfAssist { camera.mfAssistEnd() } else { camera.mfAssistStart(x: n.x * 1000, y: n.y * 1000) }
+                                        return
+                                    }
                                     camera.touch(x: n.x * 1000, y: n.y * 1000)
                                     withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) { touchPoint = n; touchActive = true }
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
@@ -910,7 +1040,28 @@ struct ContentView: View {
                                     }
                                 }
                         }
-                        if let m = touchPoint {
+                        if let pk = stream.peakImage, peakLevel != .off, problem == nil {
+                            Image(decorative: pk, scale: 1).resizable().interpolation(.none)
+                                .frame(width: fit.width, height: fit.height)
+                                .allowsHitTesting(false)
+                        }
+                        if camera.mfAssist {
+                            VStack {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "plus.magnifyingglass")
+                                    Text("MF ASSIST").font(.system(size: 12, weight: .bold, design: .rounded))
+                                    Text("click or Esc to close").font(.system(size: 11)).opacity(0.7)
+                                }
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 12).padding(.vertical, 6)
+                                .glass(Capsule())
+                                .padding(.top, fit.height * 0.09)
+                                Spacer()
+                            }
+                            .allowsHitTesting(false)
+                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                        }
+                        if let m = touchPoint, !camera.mfAssist, camera.state?.current["focus_mode"] != "MF" {
                             AFPointBox(active: touchActive, side: fit.width * 0.09)
                                 .position(x: m.x * fit.width, y: m.y * fit.height)
                                 .allowsHitTesting(false)
@@ -926,8 +1077,7 @@ struct ContentView: View {
             Text(statusLine)
                 .font(.system(size: 10, design: .monospaced)).foregroundStyle(.white.opacity(0.6))
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(Color.black)
+                .padding(.horizontal, 10).padding(.vertical, 4)
         }
     }
 
@@ -1034,6 +1184,8 @@ struct ContentView: View {
         case "g": showGrid.toggle()
         case "l": showLevel.toggle()
         case "h": showHistogram.toggle()
+        case "p": peakLevel = peakLevel == .off ? .mid : .off
+        case "\u{1b}": camera.mfAssistEnd()
         case "s": showPanel.toggle()
         case "[": camera.focus("near_slow")
         case "]": camera.focus("far_slow")

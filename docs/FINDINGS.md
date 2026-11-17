@@ -119,3 +119,11 @@ What we learned building this, including the mistakes, so nobody has to repeat t
   1000, 1000 = coordinate space). Which section holds the live AF frame is not mapped yet (0x01000013 [10]/[12]/[14]/[15]
   looked like a frame but didn't follow touches).
 - Aperture: the camera lists every 0.1 f-stop; real steps are the 1/3-stop scale.
+
+## MF assist (from LUMIX Tether, verified on a DC-S9)
+
+- Op 0x9416 with 0x03000051 start (mode, 0, x, y, 0), 0x03000052 set ratio (3 params), 0x03000053 move (x, y),
+  0x03000054 end, 0x03000055 one-point, 0x03000056 zoom start (4 params); u16 params, 0..1000.
+- Start mode 2 = magnified live view at (x, y) (live view frames change; start at another point shows another area,
+  move to a point = same view as starting there). Mode 0 accepted with no visible change; 1, 3–5 refused (0x201D).
+- In MF the AF area commands are refused (0x201D): touch in MF = MF assist.

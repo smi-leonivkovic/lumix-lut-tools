@@ -11,6 +11,7 @@ GET  /state         JSON: phase (connecting|live|error), status, error, camera (
 POST /set           JSON {"key": ..., "label": ...}   (labels as listed in /state options)
 POST /af, /shutter, /undo, /size {"size": "1280x960"}
 POST /touch        {"x": 0..1000, "y": 0..1000, "af": true}  move the AF area (touch AF), then AF once
+POST /mfassist     {"action": start|move|end, "x": 0..1000, "y": 0..1000, "mode": 1}  magnified MF assist
 POST /focus        {"step": near_fast|near_slow|far_slow|far_fast|stop, "ms": 120}  MF drive pulse (focus mode MF)
 Commands wait for the camera (up to 8 s) and answer {"ok": true, "message"} or {"ok": false, "error"} (4xx/5xx).
 Binds to 127.0.0.1 only. Exit code 2 if the port is taken. SIGTERM stops live view cleanly before exiting.
@@ -117,6 +118,9 @@ class CameraService:
                             jpg, hdr = liveview.frame(cam)
                             self.t_fetch = time.perf_counter() - t0
                             self.header = liveview.parse_header(hdr)
+                            with self.cond:  # publish the frame (stream clients wait on this)
+                                self.jpg, self.seq, self.t_frame = jpg, self.seq + 1, time.time()
+                                self.cond.notify_all()
                             n += 1
                             if time.time() - t_fps >= 1:
                                 self.fps, n, t_fps = n / (time.time() - t_fps), 0, time.time()
@@ -188,6 +192,9 @@ class CameraService:
                 rc = liveview.autofocus(cam)
                 return rc == 0x2001, 'focus here' if rc == 0x2001 else f'AF area moved, AF failed (0x{rc:04x})'
             return True, 'AF area moved'
+        if w[0] == 'mfassist':
+            rc = liveview.mf_assist(cam, w[1], w[2], w[3], w[4])
+            return rc == 0x2001, f'MF assist {w[1]}' if rc == 0x2001 else f'MF assist {w[1]} refused (0x{rc:04x})'
         if w[0] == 'set':
             settings.write(cam, w[1], w[2])
             return True, f'{w[1].replace("_", " ")} = {settings.label_of(self.opts, w[1], w[2])}'
@@ -338,6 +345,15 @@ def make_handler(svc):
                     if not (0 <= x <= 1000 and 0 <= y <= 1000):
                         return self.send(400, {'ok': False, 'error': 'x and y must be within 0..1000'})
                     ok, msg = svc.submit(('touch', x, y, bool(body.get('af', True))))
+                elif self.path == '/mfassist':
+                    action = body.get('action')
+                    if action not in ('start', 'move', 'end'):
+                        return self.send(400, {'ok': False, 'error': 'action must be start, move or end'})
+                    try:
+                        x, y, mode = float(body.get('x', 500)), float(body.get('y', 500)), int(body.get('mode', 1))
+                    except (TypeError, ValueError):
+                        return self.send(400, {'ok': False, 'error': 'x, y (0..1000) and mode must be numbers'})
+                    ok, msg = svc.submit(('mfassist', action, x, y, mode))
                 elif self.path == '/size':
                     size = body.get('size', '1280x960')
                     if size not in SIZES:

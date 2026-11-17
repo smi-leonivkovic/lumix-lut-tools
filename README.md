@@ -48,7 +48,8 @@ operations are blocked in the transport. Tests: `python tests/test_offline.py`, 
 `apps/LumixOS` is a SwiftUI app: low-latency live view (1280x960 @ 30 fps, newest frame only) with a camera-style
 HUD over the picture: WB/Kelvin, Photo Style (+ LUT opacity), quality on top; mode, aperture, EV, ISO, shutter,
 remaining shots and battery at the bottom; grid, centre cross, level line, optional histogram. Hover a value to open
-its options, click to set it. Focus: click the picture for touch AF (moves the AF area there and focuses), AF (f), focus
+its options, click to set it. Focus: click the picture for touch AF (moves the AF area there and focuses; in MF it opens the
+magnified MF assist there instead, click/Esc closes), focus peaking (p, Low/Mid/High, 4 colours), AF (f), focus
 mode AFS/AFC/MF in the HUD, an MF ring on the right (drag up = far; grabbing it switches to MF), `[` `]` keys
 (`{` `}` fast) or the scroll wheel. Aperture lists real 1/3 stops only. Keys: space shutter, g grid, l level,
 h histogram, s settings panel. **Camera** menu: send the live view into **OBS Virtual Camera** (no signing needed: LumixOS

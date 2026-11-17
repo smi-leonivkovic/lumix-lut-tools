@@ -113,6 +113,23 @@ def af_frame(cam):
     return None
 
 
+# MF assist (magnified live view), same Rec Ctrl framing; from LUMIX Tether: start (mode, 0, x, y, 0),
+# set ratio (3 params), move (x, y), end, one-point, zoom start (4 params). Coordinates 0..1000.
+MFA_START, MFA_RATIO, MFA_MOVE, MFA_END, MFA_ONEPOINT, MFA_ZOOMSTART = (0x03000051, 0x03000052, 0x03000053,
+                                                                       0x03000054, 0x03000055, 0x03000056)
+
+
+def mf_assist(cam, action, x=500, y=500, mode=1):
+    x, y = max(0, min(1000, int(x))), max(0, min(1000, int(y)))
+    if action == 'start':
+        return rec_ctrl(cam, MFA_START, mode, 0, x, y, 0)
+    if action == 'move':
+        return rec_ctrl(cam, MFA_MOVE, x, y)
+    if action == 'end':
+        return rec_ctrl(cam, MFA_END)
+    raise ValueError(action)
+
+
 def shutter(cam):
     """Take a picture to the card (not downloaded)."""
     rc, _, _ = cam.tx(REC_RELEASE, [RELEASE_PHOTO])

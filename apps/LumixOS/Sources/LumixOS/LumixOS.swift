@@ -476,16 +476,16 @@ struct HUDItem<Label: View>: View {
                 inside ? hover.enter(id) : hover.leave(id)
             }
             .onTapGesture { if !columns.isEmpty { hover.toggle(id) } }
-            .overlay(alignment: opensDown ? .topLeading : .bottomLeading) {
+            .overlay(alignment: opensDown ? .top : .bottom) {  // centred: the pointer sits right over the value
                 if isOpen {
                     menu
                         .onHover { inside in inside ? hover.enter(id) : hover.leave(id) }
                         .offset(y: opensDown ? itemHeight + 6 : -(itemHeight + 6))
                         .transition(.asymmetric(
-                            insertion: .scale(scale: 0.86, anchor: opensDown ? .topLeading : .bottomLeading)
+                            insertion: .scale(scale: 0.86, anchor: opensDown ? .top : .bottom)
                                 .combined(with: .opacity)
                                 .combined(with: .offset(y: opensDown ? -8 : 8)),
-                            removal: .opacity.combined(with: .scale(scale: 0.96, anchor: opensDown ? .topLeading : .bottomLeading))))
+                            removal: .opacity.combined(with: .scale(scale: 0.96, anchor: opensDown ? .top : .bottom))))
                 }
             }
             .zIndex(isOpen ? 10 : 0)
@@ -502,11 +502,8 @@ struct HUDItem<Label: View>: View {
         }
         .padding(.vertical, fs * 0.35)
         .padding(.horizontal, fs * 0.3)
-        .background(  // same fading shade as the MF dial
-            LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black.opacity(0.42), location: 0.15),
-                                   .init(color: .black.opacity(0.42), location: 0.85), .init(color: .clear, location: 1)],
-                           startPoint: .leading, endPoint: .trailing),
-            in: RoundedRectangle(cornerRadius: fs * 0.9, style: .continuous))
+        .contentShape(Rectangle())  // keeps hover alive between the dials
+        .shadow(color: .black.opacity(0.55), radius: 2)
         .fixedSize()
     }
 }

@@ -6,7 +6,7 @@
    parameters copied from a real, captured LUMIX Lab LUT transfer. No guessing of types or values.
 3. Property writes over USB (`0x9403`) only for settings that the camera menu also offers (Photo Style, ISO,
    exposure compensation, ...). Record the old value first and restore it afterwards.
-4. Back up before any new kind of write (see [BACKUP.md](BACKUP.md)).
+4. Back up your settings (Setup → Save/Restore Camera Setting) and keep copies of every LUT before any new kind of write.
 5. `gphoto2 --capture-image-and-download` deletes the file from the card after download. That is fine for test shots,
    but never point it at existing card content.
 

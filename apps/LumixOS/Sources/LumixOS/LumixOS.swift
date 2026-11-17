@@ -465,7 +465,7 @@ struct HUDItem<Label: View>: View {
         label()
             .font(.system(size: fs, weight: .semibold, design: .rounded))
             .foregroundStyle(.white)
-            .shadow(color: .black.opacity(0.9), radius: 1.5)
+            .shadow(color: .black.opacity(0.35), radius: 4)
             .padding(.horizontal, fs * 0.35)
             .frame(height: itemHeight)
             .background(isOpen ? Color.white.opacity(0.18) : (columns.isEmpty ? .clear : Color.white.opacity(0.001)),
@@ -503,7 +503,6 @@ struct HUDItem<Label: View>: View {
         .padding(.vertical, fs * 0.35)
         .padding(.horizontal, fs * 0.3)
         .contentShape(Rectangle())  // keeps hover alive between the dials
-        .shadow(color: .black.opacity(0.55), radius: 2)
         .fixedSize()
     }
 }
@@ -598,7 +597,7 @@ struct ValueDial: View {
                 .frame(width: fs * 0.42, height: fs * 0.36)
                 .rotationEffect(.degrees(-90))
         }
-        .shadow(color: .black.opacity(0.6), radius: 1.2)
+        .shadow(color: .black.opacity(0.35), radius: 4)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: current)
         .onAppear { lastTick = Int(currentIndex) }
     }
@@ -864,11 +863,10 @@ struct FocusRing: View {
             .help(isMF ? "Back to AFC" : "Manual focus")
         }
         .foregroundStyle(dialOrange)
-        .shadow(color: .black.opacity(0.6), radius: 1.5)
+        .shadow(color: .black.opacity(0.35), radius: 4)
         .padding(.vertical, fs * 0.5)
         .padding(.leading, fs * 0.2)
         .padding(.trailing, fs * 0.1)
-        .shadow(color: .black.opacity(0.5), radius: 2)
         .animation(.easeOut(duration: 0.2), value: isMF)
         .help("MF dial: drag up for far, down for near (faster = faster). Grabbing it switches the camera to MF. "
               + "Also [ ] keys ({ } fast) and the scroll wheel.")

@@ -839,8 +839,8 @@ struct FocusRing: View {
         ZStack(alignment: .trailing) {
             Color.clear.frame(width: w * 1.9).contentShape(Rectangle())
             content(width: w)
-                .offset(x: expanded ? 0 : w * 0.62)
-                .opacity(expanded ? 1 : (isMF ? 0.55 : 0.35))
+                .offset(x: expanded ? 0 : w * 0.38)
+                .opacity(expanded ? 1 : (isMF ? 0.8 : 0.55))
         }
         .onHover { h in withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) { hovering = h } }
         .animation(.spring(response: 0.32, dampingFraction: 0.82), value: grabbed)
@@ -848,9 +848,9 @@ struct FocusRing: View {
 
     func content(width w: CGFloat) -> some View {
         VStack(spacing: fs * 0.2) {
-            Text("∞").font(.system(size: fs * 0.62, weight: .semibold, design: .rounded))
+            Text("∞").font(.system(size: fs * 0.62, weight: .semibold, design: .rounded)).opacity(expanded ? 1 : 0)
             dial(width: w)
-            Text("NEAR").font(.system(size: fs * 0.38, weight: .bold, design: .rounded))
+            Text("NEAR").font(.system(size: fs * 0.38, weight: .bold, design: .rounded)).opacity(expanded ? 1 : 0)
             Button {
                 camera.set("focus_mode", isMF ? "AFC" : "MF")
             } label: {
@@ -862,6 +862,7 @@ struct FocusRing: View {
             }
             .buttonStyle(.plain)
             .padding(.top, fs * 0.15)
+            .opacity(expanded ? 1 : 0)
             .help(isMF ? "Back to AFC" : "Manual focus")
         }
         .foregroundStyle(dialOrange)
@@ -869,11 +870,7 @@ struct FocusRing: View {
         .padding(.vertical, fs * 0.5)
         .padding(.leading, fs * 0.2)
         .padding(.trailing, fs * 0.1)
-        .background(  // soft shade that fades out at both ends, flush with the right edge
-            LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black.opacity(0.32), location: 0.2),
-                                   .init(color: .black.opacity(0.32), location: 0.8), .init(color: .clear, location: 1)],
-                           startPoint: .top, endPoint: .bottom),
-            in: UnevenRoundedRectangle(topLeadingRadius: fs, bottomLeadingRadius: fs, style: .continuous))
+        .shadow(color: .black.opacity(0.5), radius: 2)
         .animation(.easeOut(duration: 0.2), value: isMF)
         .help("MF dial: drag up for far, down for near (faster = faster). Grabbing it switches the camera to MF. "
               + "Also [ ] keys ({ } fast) and the scroll wheel.")

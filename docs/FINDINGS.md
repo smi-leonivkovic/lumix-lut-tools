@@ -55,7 +55,14 @@ What we learned building this, including the mistakes, so nobody has to repeat t
   `#GRAINEFFECT L60`, `LUT_3D_SIZE 33`, data (no DOMAIN lines), uploaded over USB in one transfer. Shots then record
   maker note `MonochromeGrainEffect = 5` (was Off) and show visible grain at 100%. L20 was too faint to notice.
   The library list (GetLutInfo) reports 0 in the grain/noise/sharpness fields regardless, so check a shot, not the list.
-  `#COLORNOISE`, `#SHARPNESS`, `#NOISEREDUCTION` use the same syntax but are not verified yet.
+  **`#COLORNOISE L0` verified too:** with it the camera's own colour-noise setting (0x020001F2) switched to off when
+  the LUT was uploaded/active, and shots record `MonochromeGrainEffect` 3 (High grain, no colour noise) instead of 6.
+  The camera loads these tags into its settings. Without the tag, High grain inherits the camera's colour-noise
+  setting (colour speckles on B&W looks). `#SHARPNESS`, `#NOISEREDUCTION`: same syntax, not verified yet.
+- Grain strengths: L1–33 Low, L34–66 Standard, L67–100 High; no size control. L20 was hard to see, L60 clear, L85 strong.
+- More Rec properties found by testing (tether mode): 0x020001F2 colour noise on/off, 0x020001F3 LUT 1 on/off,
+  0x020001F9 LUT opacity (10–100). 0x020001FB accepts writes but didn't change the active LUT.
+- LUT upload/rename/sort/delete also work in **PC (Tether)** USB mode (04da:2382); no need to switch to LUMIX Lab mode.
 - A `.cube` without a base tag is applied on V-Log. That's right for V-Log LUTs (ARRI 709_Legacy, S5II Legacy packs)
   and wrong for Standard ones; `lumix_lut.py selftest` lists which LUTs sit on that default.
 

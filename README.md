@@ -45,11 +45,17 @@ operations are blocked in the transport. Tests: `python tests/test_offline.py`, 
 
 ## LumixOS (macOS app) and lumix-server
 
-`apps/LumixOS` is a SwiftUI app: low-latency live view (1280x960 @ 30 fps, newest frame only, hardware JPEG decode),
-current style/exposure badge, settings panel (values the camera offers in its current mode), AF and shutter.
-It starts `python -m lumix.server` (127.0.0.1:8765, MJPEG `/stream`, `/state`, `/set`, `/af`, `/shutter`, `/undo`)
-from this repo's `.venv` (or `LUMIX_REPO`). Build: `apps/LumixOS/build_app.sh`. A Tk version: `python -m lumix.monitor`.
-Status: prototype; the camera-style HUD with hover menus is next (see docs/ROADMAP.md).
+`apps/LumixOS` is a SwiftUI app: low-latency live view (1280x960 @ 30 fps, newest frame only) with a camera-style
+HUD over the picture: WB/Kelvin, Photo Style (+ LUT opacity), quality on top; mode, aperture, EV, ISO, shutter,
+remaining shots and battery at the bottom; grid, centre cross, level line, optional histogram. Hover a value to open
+its options, click to set it. Keys: space shutter, f AF, g grid, l level, h histogram, s settings panel.
+Errors (no camera, unplugged, camera held by another program, live view refused, service crash) are shown on the
+picture with a Retry button; the app restarts the service if it dies (log: `~/Library/Logs/LumixOS/server.log`).
+
+The app starts `python -m lumix.server` (127.0.0.1:8765; `/stream`, `/stream?raw=1`, `/state`, `/set`, `/af`,
+`/shutter`, `/undo`, `/size`; commands answer `{ok, message|error}`) from this repo's `.venv` (or `LUMIX_REPO`).
+Build: `apps/LumixOS/build_app.sh`. A Tk version: `python -m lumix.monitor`.
+The level line assumes LevelInfo (0x17000005) carries roll in 0.1° (not yet verified by tilting).
 
 ## Quick start (LUT upload)
 

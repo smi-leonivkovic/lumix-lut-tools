@@ -140,5 +140,36 @@ def options(cam):
     return {k: v for k, v in out.items() if v}
 
 
+CAMERA_MODES = {1: 'A'}  # 0x02000080; only A verified on a DC-S9 (allowed 0 1 9 4 3)
+CARD_INFO, SHOTS_LEFT = 0x12000010, 0x12000011
+
+
+def hud(cam):
+    """Camera-screen values that aren't settable: battery %, remaining shots, mode, shutter (in A/P)."""
+    out = {}
+    try:
+        rc, _, d = cam.tx(0x1015, [0x5001])  # standard GetDevicePropValue BatteryLevel
+        if rc == OK and d:
+            out['battery'] = d[0]
+    except CameraError:
+        raise
+    except Exception:
+        pass
+    rc, _, d = cam.tx(0x9414, [CARD_INFO])  # GetParamInfo: [u32 code][u32 size][value] entries
+    o = 0
+    while rc == OK and o + 8 <= len(d):
+        code, size = struct.unpack('<II', d[o:o + 8])
+        if code == SHOTS_LEFT and size == 4:
+            out['shots'] = struct.unpack('<I', d[o + 8:o + 12])[0]
+        o += 8 + size
+    m = get(cam, 0x02000080)
+    if m is not None:
+        out['mode'] = CAMERA_MODES.get(m, f'mode {m}')
+    sh = read(cam, 'shutter')
+    if sh is not None:
+        out['shutter'] = shutter_label(sh)
+    return out
+
+
 def label_of(opts, key, raw):
     return next((l for l, v in opts.get(key, []) if v == raw), str(raw))

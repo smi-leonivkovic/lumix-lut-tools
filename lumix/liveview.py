@@ -69,3 +69,23 @@ def shutter(cam):
     """Take a picture to the card (not downloaded)."""
     rc, _, _ = cam.tx(REC_RELEASE, [RELEASE_PHOTO])
     return rc
+
+
+def parse_header(h):
+    """Live view header sections ([u32 code][u32 size][data], codes 0x1700000x) -> dict.
+    histogram: 64 luminance bins (0x17000003); level: (a, b) signed raw values of LevelInfo (0x17000005),
+    presumably roll/pitch in 0.1 deg (unverified); rotation (0x17000004)."""
+    out, o = {}, 0
+    while o + 8 <= len(h):
+        code, size = struct.unpack('<II', h[o:o + 8])
+        if code & 0xFFFFFF00 != 0x17000000:
+            break
+        d = h[o + 8:o + 8 + size]
+        o += 8 + size
+        if code == 0x17000003 and len(d) >= 80:
+            out['histogram'] = list(d[16:80])
+        elif code == 0x17000004 and len(d) >= 6:
+            out['rotation'] = struct.unpack('<H', d[4:6])[0]
+        elif code == 0x17000005 and len(d) >= 8:
+            out['level'] = struct.unpack('<hh', d[4:8])
+    return out

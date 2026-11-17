@@ -517,6 +517,7 @@ struct ValueDial: View {
     let current: String?
     let fs: CGFloat
     let pick: (String) -> Void
+    let tint = Color.white  // HUD white; orange is the MF dial's
     @State private var dragStart: CGFloat?
     @State private var pos: CGFloat?  // fractional index while dragging
     @State private var lastTick = 0
@@ -534,7 +535,7 @@ struct ValueDial: View {
         let w = width, sp = spacing
         VStack(spacing: fs * 0.1) {
             Text(title.uppercased()).font(.system(size: fs * 0.42, weight: .heavy, design: .rounded))
-                .foregroundStyle(dialOrange.opacity(0.75))
+                .foregroundStyle(tint.opacity(0.75))
             ZStack {
                 // ticks: one major per value, two minor between
                 Canvas { ctx, size in
@@ -549,7 +550,7 @@ struct ValueDial: View {
                             let major = k == 0
                             path.move(to: CGPoint(x: x, y: size.height * (major ? 0.05 : 0.3)))
                             path.addLine(to: CGPoint(x: x, y: size.height * 0.95))
-                            ctx.stroke(path, with: .color(dialOrange.opacity(major ? 0.95 : 0.55)),
+                            ctx.stroke(path, with: .color(tint.opacity(major ? 0.95 : 0.55)),
                                        style: StrokeStyle(lineWidth: major ? 2 : 1.3, lineCap: .round))
                         }
                     }
@@ -563,7 +564,7 @@ struct ValueDial: View {
                         let centred = abs(CGFloat(i) - p) < 0.5
                         Text(label)
                             .font(.system(size: fs * (centred ? 0.82 : 0.66), weight: centred ? .bold : .semibold, design: .rounded))
-                            .foregroundStyle(dialOrange.opacity(centred ? 1 : 0.7))
+                            .foregroundStyle(tint.opacity(centred ? 1 : 0.7))
                             .fixedSize()
                             .position(x: x, y: fs * 0.3)
                             .onTapGesture { pick(options[i]) }
@@ -593,7 +594,7 @@ struct ValueDial: View {
                     if options.indices.contains(i), options[i] != current { pick(options[i]) }
                 })
             Triangle()
-                .fill(dialOrange)
+                .fill(tint)
                 .frame(width: fs * 0.42, height: fs * 0.36)
                 .rotationEffect(.degrees(-90))
         }

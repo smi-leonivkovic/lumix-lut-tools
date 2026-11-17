@@ -64,6 +64,10 @@ What we learned building this, including the mistakes, so nobody has to repeat t
 - More Rec properties found by testing (tether mode): 0x020001F2 colour noise on/off, 0x020001F3 LUT 1 on/off,
   0x020001F9 LUT opacity (10–100). 0x020001FB accepts writes but didn't change the active LUT.
 - LUT upload/rename/sort/delete also work in **PC (Tether)** USB mode (04da:2382); no need to switch to LUMIX Lab mode.
+  In tether mode GetLutInfo records are **262 bytes** (id, name, style, type) instead of 272 (no grain/noise/visibility
+  fields); the parser detects it from the size field.
+- `pipeline/add_grain.py IN OUT LEVEL` writes a camera LUT with grain (colour noise off by default). Standard (L50) is a
+  good default for colour looks; High (L85) for heavy B&W.
 - A `.cube` without a base tag is applied on V-Log. That's right for V-Log LUTs (ARRI 709_Legacy, S5II Legacy packs)
   and wrong for Standard ones; `lumix_lut.py selftest` lists which LUTs sit on that default.
 

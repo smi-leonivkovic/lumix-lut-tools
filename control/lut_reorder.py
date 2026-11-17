@@ -13,16 +13,14 @@ import lumix_lut as LL
 
 
 def read(p):
+    """Names by position (empty string for gaps), trailing empties dropped. Works for 262- and 272-byte records."""
     rc, d = LL.lut_info(p)
     assert rc == 0x2001, hex(rc)
-    out = []
-    for i in range((len(d) - 9) // 272):  # all records; deleted LUTs leave empty-name gaps
-        o = 9 + i * 272
-        rid = struct.unpack('<H', d[o:o + 2])[0]
-        out.append((rid, d[o + 2:o + 258].split(b'\0')[0].decode('ascii', 'replace')))
-    names = [name for _, name in sorted(out)]
-    while names and not names[-1]:
-        names.pop()
+    entries = LL.parse_lutinfo(d)
+    n = max((e['pos'] for e in entries), default=-1) + 1
+    names = [''] * n
+    for e in entries:
+        names[e['pos']] = e['name']
     return names
 
 

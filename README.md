@@ -16,11 +16,12 @@ connection probably speak the same protocol, but are untested.
 | Rename / reorder | `control/lumix_lut.py rename SLOT "Name"`, `control/lut_reorder.py order.txt --start=2` |
 | Read device info in any USB mode | `control/devinfo.py` |
 | Tethered shooting, Photo Style / format / WB / EV over USB | `control/lumixctl.py`, `control/tether_pairs.py` |
+| Add grain (no colour noise) to any LUT | `pipeline/add_grain.py my.cube my_grain.cube 50` |
 | Preset → 33-point camera LUT, evaluation sheets | `pipeline/` (needs LightCraft, see below) |
 
 ## Quick start (LUT upload)
 
-1. Camera: **Setup → USB Mode → LUMIX Lab**, connect by USB.
+1. Camera: **Setup → USB Mode → PC (Tether)** (or LUMIX Lab), connect by USB.
 2. `pip install -r requirements.txt` (pyusb) and `brew install libusb`.
 3. ```sh
    python3 control/lumix_lut.py list

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LUT Library control over USB (camera USB mode "LUMIX Lab", 04da:2387), using the commands LUMIX Lab 3.1.0 uses
+"""LUT Library control over USB (camera USB mode PC (Tether) 04da:2382 or LUMIX Lab 04da:2387), using the commands LUMIX Lab 3.1.0 uses
 (see docs/PROTOCOL.md "LUT Library protocol").
 
   lumix_lut.py selftest                     read-only checks: device, library, base styles
@@ -31,8 +31,8 @@ class PTP:
         self.dev = usb.core.find(idVendor=VID, backend=be)
         if self.dev is None:
             sys.exit('LUMIX not found on USB (on, awake, USB mode LUMIX Lab?)')
-        if self.dev.idProduct != 0x2387:
-            print(f'warning: product 0x{self.dev.idProduct:04x}, LUT commands are expected in LUMIX Lab mode (0x2387)')
+        if self.dev.idProduct not in (0x2382, 0x2387):
+            print(f'note: USB product 0x{self.dev.idProduct:04x} (expected 0x2382 PC Tether or 0x2387 LUMIX Lab)')
         try:
             self.dev.set_configuration()
         except usb.core.USBError:
@@ -87,20 +87,23 @@ TYPES = {1: 'built-in', 2: 'sample', 3: 'user'}
 
 
 def parse_lutinfo(d):
-    """GetLutInfo reply -> list of dicts (empty slots skipped). Layout: [code u32][size u32][u8 count] + 272-byte records
-    [u16 id][256 B name][u16 photo style][u16 type][u16 grain][u16 colour noise][u16 sharpness][u16 NR][u16 visibility]."""
+    """GetLutInfo reply -> list of dicts (empty slots skipped). Layout: [code u32][size u32][u8 count] + 41 records.
+    Record = [u16 id][256 B name][u16 photo style][u16 type] (262 B, PC Tether mode), followed in LUMIX Lab mode by
+    [u16 grain][u16 colour noise][u16 sharpness][u16 NR][u16 visibility] (272 B)."""
     code, size = struct.unpack('<II', d[:8])
     if code != GET_LUT_INFO:
         raise ValueError(f'unexpected code 0x{code:08x}')
+    rec = (size - 1) // 41 if (size - 1) % 41 == 0 else 272
     out = []
-    for i in range((len(d) - 9) // 272):
-        o = 9 + i * 272
+    for i in range((len(d) - 9) // rec):
+        o = 9 + i * rec
         rid = struct.unpack('<H', d[o:o + 2])[0]
         name = d[o + 2:o + 258].split(b'\0')[0].decode('ascii', 'replace')
-        style, typ, grain, cnoise, sharp, nr, vis = struct.unpack('<7H', d[o + 258:o + 272])
+        style, typ = struct.unpack('<HH', d[o + 258:o + 262])
+        extra = struct.unpack('<5H', d[o + 262:o + 272]) if rec >= 272 else (None,) * 5
         if name:
-            out.append(dict(pos=i, id=rid, name=name, style=style, type=typ, grain=grain, color_noise=cnoise,
-                            sharpness=sharp, noise_reduction=nr, visibility=vis))
+            out.append(dict(pos=i, id=rid, name=name, style=style, type=typ, grain=extra[0], color_noise=extra[1],
+                            sharpness=extra[2], noise_reduction=extra[3], visibility=extra[4], record_size=rec))
     return out
 
 
@@ -125,7 +128,7 @@ def main():
                 flag = ''
                 if e['type'] == 3 and e['style'] == 65535:
                     flag = '  (no base tag: camera uses V-Log; right for V-Log LUTs, wrong for Standard ones)'; bad += 1
-                print(f"{e['pos']:2d} {TYPES.get(e['type'], e['type']):8s} {STYLES.get(e['style'], e['style'])!s:5s} {e['name']}{flag}")
+                print(f"{e['pos']:2d} {str(TYPES.get(e['type'], e['type'])):8s} {str(STYLES.get(e['style'], e['style'])):5s} {e['name']}{flag}")
             print(f'selftest done: {bad} user LUT(s) on the V-Log default base (check they are V-Log LUTs)')
         elif cmd == 'list':
             rc, d = lut_info(p)

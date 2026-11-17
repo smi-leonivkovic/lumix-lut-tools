@@ -51,7 +51,11 @@ What we learned building this, including the mistakes, so nobody has to repeat t
   exposure, so highlights don't clip.
 - **Strip absolute white balance** from presets (Kelvin/tint): a LUT can't set a colour temperature, the fit turns it
   into a fixed cast (here cool/magenta). Keep WB as shot so the camera's AWB decides; `settings/nospatial.json` does this.
-- Grain, colour noise, sharpness and noise reduction can travel with the LUT as header lines (`#GRAINEFFECT L%d` …).
+- Grain, colour noise, sharpness and noise reduction can travel with the LUT as header lines (`#GRAINEFFECT L%d` …),
+  per LUMIX Lab's native writer. Not verified on camera: the library list reports 0 for these fields on every LUT,
+  including ones sent by LUMIX Lab.
+- A `.cube` without a base tag is applied on V-Log. That's right for V-Log LUTs (ARRI 709_Legacy, S5II Legacy packs)
+  and wrong for Standard ones; `lumix_lut.py selftest` lists which LUTs sit on that default.
 
 ## Firmware
 

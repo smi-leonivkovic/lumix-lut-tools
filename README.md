@@ -10,6 +10,7 @@ connection probably speak the same protocol, but are untested.
 
 | Task | Tool |
 |---|---|
+| Read-only check of camera and library | `control/lumix_lut.py selftest` |
 | List the LUT Library (names, base Photo Style, type) | `control/lumix_lut.py list` |
 | Upload a `.cube` into a slot (new or replace) | `control/lumix_lut.py push FILE.cube SLOT "Name"` |
 | Rename / reorder | `control/lumix_lut.py rename SLOT "Name"`, `control/lut_reorder.py order.txt --start=2` |
@@ -37,6 +38,14 @@ On macOS the system camera service `ptpcamerad` grabs the camera; the tools kill
 - [docs/METHOD.md](docs/METHOD.md): how the preset → LUT pipeline works and why
 - [docs/CODES.md](docs/CODES.md): all command/parameter code tables
 - [docs/SAFETY.md](docs/SAFETY.md): what these tools never do
+- [docs/DEVNOTES.md](docs/DEVNOTES.md): how it was built, including dead ends
+- [docs/REPRODUCE.md](docs/REPRODUCE.md): verify the protocol against a newer LUMIX Lab yourself
+- [docs/FIRMWARE.md](docs/FIRMWARE.md): official firmware link and checksums
+- [docs/TESTED.md](docs/TESTED.md): tested cameras (add yours)
+- [docs/scans/](docs/scans/): raw property dumps, firmware 1.5 and 2.1
+- [examples/](examples/): demo LUTs, start with `identity_std.cube`
+
+Offline test: `python3 tests/test_parse.py`.
 
 ## Safety
 

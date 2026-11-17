@@ -1,1 +1,1 @@
-{"detail": {"sharpen_amount": 0, "nr_color": 0, "nr_luminance": 0}, "effects": {"clarity": 0, "dehaze": 0, "texture": 0}, "grain": {"amount": 0}, "vignette": {"amount": 0}, "optics": {"lens_profile": false, "remove_ca": false, "vignetting": 0, "distortion": 0}}
+{"detail": {"sharpen_amount": 0, "nr_color": 0, "nr_luminance": 0}, "effects": {"clarity": 0, "dehaze": 0, "texture": 0}, "grain": {"amount": 0}, "vignette": {"amount": 0}, "optics": {"lens_profile": false, "remove_ca": false, "vignetting": 0, "distortion": 0}, "wb": {"mode": "asShot"}}

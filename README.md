@@ -19,6 +19,29 @@ connection probably speak the same protocol, but are untested.
 | Add grain (no colour noise) to any LUT | `pipeline/add_grain.py my.cube my_grain.cube 50` |
 | Preset → 33-point camera LUT, evaluation sheets | `pipeline/` (needs LightCraft, see below) |
 
+## lumix-mcp (MCP server)
+
+Lets an AI assistant (Claude Code, Claude Desktop, any MCP client) drive the camera: list/upload/rename/move/delete LUTs,
+write grain into LUTs, set Photo Style, white balance, ISO, exposure, aperture, image format, LUT opacity, take pictures
+and report what the camera applied (LUT, grain, WB).
+
+```sh
+python3 -m venv .venv && .venv/bin/pip install -e .     # needs libusb (brew install libusb); capture needs gphoto2 + exiftool
+claude mcp add lumix-mcp -- "$PWD/.venv/bin/lumix-mcp"   # Claude Code; other clients: command = .venv/bin/lumix-mcp (stdio)
+```
+
+| Tool | |
+|---|---|
+| `camera_status`, `selftest`, `list_luts` | read only |
+| `upload_lut` (grain/colour noise optional), `rename_lut`, `move_lut`, `delete_lut` | LUT Library; delete/replace need `confirm=true` |
+| `write_lut_file` | camera-ready `.cube` with header tags, no camera needed |
+| `set_photo_style`, `set_white_balance`, `set_exposure`, `set_image_format`, `set_lut_options` | verified by read-back |
+| `restore_settings` | undo every setting change made through the server |
+| `capture` | shoot + download, returns files and the applied LUT/grain/WB/ISO |
+
+Not possible over USB (as far as tested): choosing the active LUT, P/A/S/M, custom modes, i.Dynamic. Firmware
+operations are blocked in the transport. Tests: `python tests/test_offline.py`, with a camera `python tests/live_mcp_test.py [--write]`.
+
 ## Quick start (LUT upload)
 
 1. Camera: **Setup → USB Mode → PC (Tether)** (or LUMIX Lab), connect by USB.

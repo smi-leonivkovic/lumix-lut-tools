@@ -1,0 +1,2 @@
+[console_scripts]
+lumix-mcp = lumix.mcp_server:main

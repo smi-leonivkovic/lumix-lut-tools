@@ -59,7 +59,8 @@ What we learned building this, including the mistakes, so nobody has to repeat t
   the LUT was uploaded/active, and shots record `MonochromeGrainEffect` 3 (High grain, no colour noise) instead of 6.
   The camera loads these tags into its settings. Without the tag, High grain inherits the camera's colour-noise
   setting (colour speckles on B&W looks). `#SHARPNESS`, `#NOISEREDUCTION`: same syntax, not verified yet.
-- Grain strengths: L1–33 Low, L34–66 Standard, L67–100 High; no size control. L20 was hard to see, L60 clear, L85 strong.
+- Grain strengths: L1–33 Low, L34–66 Standard, L67–100 High; no size control. L20 was hard to see, L50–60 clear,
+  L85 strong. Maker note `MonochromeGrainEffect`: 1/2/3 = Low/Standard/High, 4/5/6 = the same with colour noise.
 - More Rec properties found by testing (tether mode): 0x020001F2 colour noise on/off, 0x020001F3 LUT 1 on/off,
   0x020001F9 LUT opacity (10–100). 0x020001FB accepts writes but didn't change the active LUT.
 - LUT upload/rename/sort/delete also work in **PC (Tether)** USB mode (04da:2382); no need to switch to LUMIX Lab mode.

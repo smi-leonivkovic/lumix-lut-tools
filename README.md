@@ -34,6 +34,7 @@ claude mcp add lumix-mcp -- "$PWD/.venv/bin/lumix-mcp"   # Claude Code; other cl
 |---|---|
 | `camera_status`, `selftest`, `list_luts` | read only |
 | `upload_lut` (grain/colour noise optional), `rename_lut`, `move_lut`, `delete_lut` | LUT Library; delete/replace need `confirm=true` |
+| `download_lut`, `backup_luts` | read LUTs back from the camera as `.cube` |
 | `write_lut_file` | camera-ready `.cube` with header tags, no camera needed |
 | `set_photo_style`, `set_white_balance`, `set_exposure`, `set_image_format`, `set_lut_options` | verified by read-back |
 | `restore_settings` | undo every setting change made through the server |
@@ -61,6 +62,7 @@ On macOS the system camera service `ptpcamerad` grabs the camera; the tools kill
 - [docs/FINDINGS.md](docs/FINDINGS.md): what we learned the hard way (pitfalls, camera behaviour, measurements)
 - [docs/METHOD.md](docs/METHOD.md): how the preset → LUT pipeline works and why
 - [docs/CODES.md](docs/CODES.md): all command/parameter code tables
+- [docs/APP_COMMANDS.md](docs/APP_COMMANDS.md): every request LUMIX Lab builds, with data layout
 - [docs/SAFETY.md](docs/SAFETY.md): what these tools never do
 - [docs/DEVNOTES.md](docs/DEVNOTES.md): how it was built, including dead ends
 - [docs/REPRODUCE.md](docs/REPRODUCE.md): verify the protocol against a newer LUMIX Lab yourself

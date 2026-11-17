@@ -75,6 +75,23 @@ def upload_lut(path: str, name: str, position: int | None = None, grain: int | N
         return {'uploaded': entry, 'bytes': len(blob)}
 
 
+@server.tool(annotations=READ)
+def download_lut(name: str, path: str) -> dict:
+    """Read a LUT back from the camera and save it as a .cube file."""
+    with Camera() as cam:
+        text = luts.download(cam, luts.find(cam, name))
+    dst = os.path.expanduser(path)
+    open(dst, 'w').write(text)
+    return {'saved': dst, 'bytes': len(text), 'header': text.split('\n')[:5]}
+
+
+@server.tool(annotations=READ)
+def backup_luts(directory: str = '~/Pictures/lumix-mcp/lut-backup') -> list[str]:
+    """Download every user LUT from the camera into a folder (position_name.cube)."""
+    with Camera() as cam:
+        return luts.backup(cam, os.path.expanduser(directory))
+
+
 @server.tool(annotations=WRITE)
 def rename_lut(name: str, new_name: str) -> list[str]:
     """Rename a LUT in the library. Returns the library names by position."""

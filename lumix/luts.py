@@ -4,8 +4,8 @@ import struct
 from .ptp import OK, CameraError
 
 GET_PARAM, SET_PARAM = 0x9414, 0x9415
-LUT_START, LUT_CANCEL, LUT_SEND = 0x9922, 0x9923, 0x9924
-GET_LUT_INFO, RENAME, DELETE, SORT = 0x53000011, 0x53000013, 0x53000014, 0x53000015
+LUT_GET, LUT_START, LUT_CANCEL, LUT_SEND = 0x9921, 0x9922, 0x9923, 0x9924
+GET_LUT_INFO, GET_LUT_FILE, RENAME, DELETE, SORT = 0x53000011, 0x53000012, 0x53000013, 0x53000014, 0x53000015
 MAX_FILE = 9437184
 FIXED_POSITIONS = (0, 1)  # Vlog_709 and the ARRI 709 sample on a DC-S9
 STYLES = {0: 'STD', 1: 'VIVD', 2: 'NAT', 3: 'MONO', 4: 'SCNY', 5: 'PORT', 18: 'VLOG', 40: 'VLOG', 65535: None}
@@ -130,3 +130,30 @@ def cube_with_tags(text, style='STD', grain=None, color_noise=None, title=None):
         hdr.append(f'#COLORNOISE L{int(color_noise)}')
     hdr.append(f'LUT_3D_SIZE {size}')
     return '\n'.join(hdr + data) + '\n'
+
+
+def download(cam, position):
+    """Read a LUT back from the camera as .cube text (LutGetFileData: code + slot byte in the command block).
+    Reply: [0x53000012 u32][size u32][file length u32][file]."""
+    rc, d = cam.tx_raw(LUT_GET, struct.pack('<I', GET_LUT_FILE) + bytes([position]), timeout=60000)
+    if rc != OK or len(d) < 12:
+        raise CameraError(f'LutGetFileData refused for position {position}: 0x{rc:04x}')
+    n = struct.unpack('<I', d[8:12])[0]
+    return d[12:12 + n].decode('ascii', 'replace')
+
+
+def backup(cam, directory):
+    """Download every user LUT into directory as '<pos>_<name>.cube'. Returns the written paths."""
+    import os
+    os.makedirs(directory, exist_ok=True)
+    out = []
+    for e in library(cam):
+        if e['type'] != 'user':
+            continue
+        safe = ''.join(c if c.isalnum() or c in ' ._-' else '_' for c in e['name']).strip() or 'lut'
+        if not safe.lower().endswith('.cube'):
+            safe += '.cube'
+        path = os.path.join(directory, f"{e['position']:02d}_{safe}")
+        open(path, 'w').write(download(cam, e['position']))
+        out.append(path)
+    return out

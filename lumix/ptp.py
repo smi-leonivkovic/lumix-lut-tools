@@ -101,6 +101,29 @@ class Camera:
     def usb_mode(self):
         return KNOWN_PRODUCTS.get(self.dev.idProduct, f'unknown (0x{self.dev.idProduct:04x})')
 
+    def tx_raw(self, code, param_bytes, timeout=30000):
+        """Transaction whose command block carries raw bytes (some Panasonic ops use non-u32 parameters)."""
+        if code in FORBIDDEN_OPS:
+            raise CameraError(f'Operation 0x{code:04x} is the firmware channel and is blocked.')
+        self.tid += 1
+        try:
+            self.out.write(struct.pack('<IHHI', 12 + len(param_bytes), 1, code, self.tid) + param_bytes, timeout=5000)
+            got = b''
+            while True:
+                buf = bytes(self.inp.read(1 << 20, timeout=timeout))
+                length = struct.unpack('<I', buf[:4])[0]
+                while len(buf) < length:
+                    buf += bytes(self.inp.read(1 << 20, timeout=timeout))
+                typ, rc = struct.unpack('<HH', buf[4:8])
+                if typ == 2:
+                    got += buf[12:length]
+                elif typ == 3:
+                    return rc, got
+        except usb.core.USBTimeoutError:
+            step = self.recover()
+            raise CameraError(f'No answer to operation 0x{code:04x}; link recovered by: {step}.' if step
+                              else f'No answer to operation 0x{code:04x}; recovery failed, replug the camera.')
+
     def tx(self, code, params, data=None, timeout=30000):
         """One PTP transaction -> (response code, response params, data in)."""
         if code in FORBIDDEN_OPS:

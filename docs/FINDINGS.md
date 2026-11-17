@@ -14,6 +14,13 @@ What we learned building this, including the mistakes, so nobody has to repeat t
 - The camera shows the name you send (up to 255 ASCII bytes; LUMIX Lab truncates to 95). Card imports keep the file
   name including `.cube`.
 
+## Reading LUTs back (backup)
+
+- **LutGetFileData 0x9921 works**: the command block carries `[0x53000012 u32][slot u8]` (5 bytes, not a u32 param;
+  sending it as a data phase gets no answer). Reply: `[0x53000012][size][file length u32][.cube text]`. The camera
+  stores the header tags it received (`#GRAINEFFECT`, `#COLORNOISE`) and writes 7-decimal floats, `TITLE ""`.
+  `lumix.luts.backup()` / MCP `backup_luts` save the whole library.
+
 ## USB modes and properties
 
 - USB mode **PC (Tether)** enumerates as 04da:2382, **LUMIX Lab** as 04da:2387. Both are PTP; Panasonic vendor commands
@@ -70,7 +77,8 @@ What we learned building this, including the mistakes, so nobody has to repeat t
   L85 strong. Maker note `MonochromeGrainEffect`: 1/2/3 = Low/Standard/High, 4/5/6 = the same with colour noise.
 - More Rec properties found by testing (tether mode): 0x020001F2 colour noise on/off, 0x020001F3 LUT 1 on/off,
   0x020001F9 LUT opacity (10–100).
-- **Active LUT selection is not exposed over PTP** (as far as tested): switching the LUT on the camera changes none of
+- **Active LUT selection is not exposed over PTP** (as far as tested; also tried: select style 0x02000223 + My Photo
+  Style edit session + 0x020001FB, on style 49 and on MY PHOTO STYLE 1 — accepted, ignored): switching the LUT on the camera changes none of
   the single properties nor the 0x020001F0/0x02000220/0x02000010 blocks; writing 0x020001FB (alone or inside the
   My Photo Style edit session 0x9419 StartEdit/EndEdit) is accepted but ignored. Next step would be recording LUMIX Lab.
 - LUT upload/rename/sort/delete also work in **PC (Tether)** USB mode (04da:2382); no need to switch to LUMIX Lab mode.

@@ -43,6 +43,14 @@ claude mcp add lumix-mcp -- "$PWD/.venv/bin/lumix-mcp"   # Claude Code; other cl
 Not possible over USB (as far as tested): choosing the active LUT, P/A/S/M, custom modes, i.Dynamic. Firmware
 operations are blocked in the transport. Tests: `python tests/test_offline.py`, with a camera `python tests/live_mcp_test.py [--write]`.
 
+## LumixOS (macOS app) and lumix-server
+
+`apps/LumixOS` is a SwiftUI app: low-latency live view (1280x960 @ 30 fps, newest frame only, hardware JPEG decode),
+current style/exposure badge, settings panel (values the camera offers in its current mode), AF and shutter.
+It starts `python -m lumix.server` (127.0.0.1:8765, MJPEG `/stream`, `/state`, `/set`, `/af`, `/shutter`, `/undo`)
+from this repo's `.venv` (or `LUMIX_REPO`). Build: `apps/LumixOS/build_app.sh`. A Tk version: `python -m lumix.monitor`.
+Status: prototype; the camera-style HUD with hover menus is next (see docs/ROADMAP.md).
+
 ## Quick start (LUT upload)
 
 1. Camera: **Setup → USB Mode → PC (Tether)** (or LUMIX Lab), connect by USB.

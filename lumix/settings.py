@@ -1,5 +1,6 @@
 """Panasonic vendor properties: read, list allowed values, write, with name <-> value mappings verified on a DC-S9."""
 import struct
+import time
 
 from .ptp import OK, CameraError
 
@@ -68,7 +69,11 @@ def allowed(cam, prop, size):
 
 def put(cam, prop, value, size):
     payload = struct.pack('<II', prop, size) + (struct.pack('<H', value) if size == 2 else struct.pack('<I', value))
-    rc, _, _ = cam.tx(SET, [prop], payload)
+    for _ in range(20):  # camera answers 0x2019 DeviceBusy while live view is streaming: retry
+        rc, _, _ = cam.tx(SET, [prop], payload)
+        if rc != 0x2019:
+            return rc
+        time.sleep(0.03)
     return rc
 
 
@@ -105,3 +110,35 @@ def status(cam):
         'lut1_on': bool(r['lut1_on']) if r['lut1_on'] is not None else None,
         'lut1_opacity': r['lut1_opacity'],
     }
+
+
+def shutter_label(v):
+    if v in (None, 0xFFFFFFFF):
+        return 'auto/bulb'
+    if v & 0x80000000:
+        s = (v & 0x7FFFFFFF) / 1000
+        return f'{s:g}"'
+    return f'1/{v / 1000:g}'
+
+
+def options(cam):
+    """Values the camera currently offers per setting: {key: [(label, raw value)]}."""
+    def lst(key):
+        rp, _, size = PROPS[key]
+        return allowed(cam, rp, size)
+    out = {}
+    out['photo_style'] = [(n, v) for n, v in PHOTO_STYLES.items() if v in set(lst('photo_style'))]
+    out['white_balance'] = [(n, v) for n, v in WB_MODES.items() if v in set(lst('white_balance'))]
+    out['iso'] = [('auto' if v == ISO_AUTO else str(v), v) for v in lst('iso') if v == ISO_AUTO or v < 0x10000000]
+    out['exposure_comp'] = sorted(((f'{ev_decode(v):+g} EV', v) for v in lst('exposure_comp')), key=lambda x: ev_decode(x[1]))
+    out['aperture'] = [(f'f/{v / 10:g}', v) for v in lst('aperture')]
+    out['shutter'] = [(shutter_label(v), v) for v in lst('shutter')]
+    out['image_format'] = [(n, v) for n, v in IMAGE_FORMATS.items()]
+    out['lut1_opacity'] = [(f'{v}%', v) for v in (lst('lut1_opacity') or list(range(10, 101, 10)))]
+    out['color_noise'] = [('off', 0), ('on', 1)]
+    out['kelvin'] = [(f'{k} K', k) for k in range(2500, 10001, 100)]
+    return {k: v for k, v in out.items() if v}
+
+
+def label_of(opts, key, raw):
+    return next((l for l, v in opts.get(key, []) if v == raw), str(raw))

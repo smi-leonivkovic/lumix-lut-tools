@@ -16,7 +16,7 @@ import tkinter as tk
 import numpy as np
 from PIL import Image, ImageDraw, ImageTk
 
-from . import liveview
+from . import liveview, settings
 from .ptp import Camera
 
 
@@ -66,8 +66,11 @@ class Monitor:
         self.root = tk.Tk()
         self.root.title('lumix-monitor')
         self.root.configure(bg='#111')
-        self.view = tk.Label(self.root, bg='#111')
-        self.view.pack(padx=8, pady=8)
+        top = tk.Frame(self.root, bg='#111'); top.pack(fill='both', expand=True)
+        self.view = tk.Label(top, bg='#111')
+        self.view.pack(side='left', padx=8, pady=8)
+        self.panel = tk.Frame(top, bg='#1b1b1b'); self.panel.pack(side='left', fill='y', padx=(0, 8), pady=8)
+        self.opts, self.current, self.original, self.widgets = None, {}, {}, {}
         bar = tk.Frame(self.root, bg='#111'); bar.pack(fill='x', padx=8, pady=(0, 8))
         for text, fn in (('AF (f)', self.af), ('Shutter (space)', self.shoot), ('Zebras (z)', self.toggle_zebras),
                          ('LUT preview (l)', self.next_lut), ('Quit (q)', self.quit)):
@@ -88,13 +91,36 @@ class Monitor:
             with Camera() as cam:
                 if self.size:
                     liveview.set_size(cam, *self.size)
+                self.opts = settings.options(cam)
+                self.current = {k: settings.read(cam, k) for k in self.opts}
+                self.original = dict(self.current)
                 liveview.start(cam)
                 self.status = 'live'
+                last_read = time.time()
                 while self.running:
                     while not self.cmds.empty():
                         cmd = self.cmds.get()
-                        rc = liveview.autofocus(cam) if cmd == 'af' else liveview.shutter(cam)
-                        self.status = f'{cmd}: {"ok" if rc == 0x2001 else hex(rc)}'
+                        try:
+                            if cmd == 'af':
+                                rc = liveview.autofocus(cam); self.status = f'AF: {"ok" if rc == 0x2001 else hex(rc)}'
+                            elif cmd == 'shutter':
+                                rc = liveview.shutter(cam); self.status = f'shutter: {"ok" if rc == 0x2001 else hex(rc)}'
+                            elif cmd == 'undo':
+                                for k, v in self.original.items():
+                                    if v is not None and settings.read(cam, k) != v:
+                                        settings.write(cam, k, v)
+                                self.status = 'all settings restored'
+                            elif cmd[0] == 'set':
+                                _, key, value = cmd
+                                settings.write(cam, key, value)
+                                self.status = f'{key} = {settings.label_of(self.opts, key, value)}'
+                        except Exception as e:
+                            self.status = f'not accepted: {e}'[:110]
+                        self.current = {k: settings.read(cam, k) for k in self.opts}
+                        last_read = time.time()
+                    if time.time() - last_read > 2:
+                        self.current = {k: settings.read(cam, k) for k in self.opts}
+                        last_read = time.time()
                     t0 = time.perf_counter()
                     jpg, _hdr = liveview.frame(cam)
                     self.t_fetch = time.perf_counter() - t0
@@ -140,7 +166,40 @@ class Monitor:
             lut_name = os.path.basename(self.luts[self.lut_i]) if self.lut else 'camera'
             self.info.configure(text=f'{self.fps:4.1f} fps | fetch {self.t_fetch*1000:4.1f} ms | process '
                                      f'{self.t_proc*1000:4.1f} ms | view: {lut_name} | {self.status}')
+        if self.opts and not self.widgets:
+            self.build_panel()
+        if self.widgets and time.time() - getattr(self, '_panel_t', 0) > 0.5:
+            self._panel_t = time.time()
+            for key, var in self.widgets.items():
+                if not getattr(var, 'busy', False):
+                    var.set(settings.label_of(self.opts, key, self.current.get(key)))
         self.root.after(2, self.ui_loop)
+
+    LABELS = [('photo_style', 'Photo Style'), ('lut1_opacity', 'LUT opacity'), ('white_balance', 'White balance'),
+              ('kelvin', 'Kelvin'), ('iso', 'ISO'), ('exposure_comp', 'Exposure comp.'), ('aperture', 'Aperture'),
+              ('shutter', 'Shutter'), ('color_noise', 'Colour noise'), ('image_format', 'Image format')]
+
+    def build_panel(self):
+        from tkinter import ttk
+        tk.Label(self.panel, text='Camera settings', fg='#eee', bg='#1b1b1b', font=('Helvetica', 14, 'bold')).pack(anchor='w', padx=10, pady=(10, 6))
+        for key, label in self.LABELS:
+            if key not in self.opts:
+                continue
+            tk.Label(self.panel, text=label, fg='#aaa', bg='#1b1b1b').pack(anchor='w', padx=10)
+            var = tk.StringVar()
+            box = ttk.Combobox(self.panel, textvariable=var, values=[l for l, _ in self.opts[key]], state='readonly', width=16)
+            box.pack(anchor='w', padx=10, pady=(0, 6))
+            box.bind('<<ComboboxSelected>>', lambda e, k=key, v=var: self.choose(k, v))
+            self.widgets[key] = var
+        tk.Button(self.panel, text='Undo all changes', command=lambda: self.cmds.put('undo')).pack(anchor='w', padx=10, pady=10)
+        tk.Label(self.panel, text='P/A/S/M and the active LUT\nare chosen on the camera.', fg='#777', bg='#1b1b1b',
+                 justify='left').pack(anchor='w', padx=10, pady=(4, 10))
+
+    def choose(self, key, var):
+        label = var.get()
+        value = next((v for l, v in self.opts[key] if l == label), None)
+        if value is not None:
+            self.cmds.put(('set', key, value))
 
     def draw_histogram(self, img, a):
         w, h = 256, 90

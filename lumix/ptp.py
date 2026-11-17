@@ -93,7 +93,10 @@ class Camera:
                                                   and usb.util.endpoint_type(e.bmAttributes) == usb.util.ENDPOINT_TYPE_BULK)
         self.out, self.inp = bulk(usb.util.ENDPOINT_OUT), bulk(usb.util.ENDPOINT_IN)
         self.tid = 0
-        rc, _, _ = self.tx(0x1002, [1])  # OpenSession
+        try:
+            rc, _, _ = self.tx(0x1002, [1])  # OpenSession
+        except CameraError:  # link was busy (e.g. live view left running by a killed client) and got recovered
+            rc, _, _ = self.tx(0x1002, [1])
         if rc not in (OK, 0x201E):
             raise CameraError(f'OpenSession failed: 0x{rc:04x}')
 

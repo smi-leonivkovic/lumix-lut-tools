@@ -7,3 +7,5 @@ data/
 *.MOV
 *.tif
 lutinfo.bin
+.build/
+*.app/

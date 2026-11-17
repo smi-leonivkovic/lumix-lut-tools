@@ -9,10 +9,11 @@ description = "Control Panasonic LUMIX cameras over USB: LUT Library, settings, 
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
-dependencies = ["pyusb>=1.3", "mcp>=2"]
+dependencies = ["pyusb>=1.3", "mcp>=2", "numpy", "pillow"]
 
 [project.scripts]
 lumix-mcp = "lumix.mcp_server:main"
+lumix-monitor = "lumix.monitor:main"
 
 [tool.setuptools]
 packages = ["lumix"]

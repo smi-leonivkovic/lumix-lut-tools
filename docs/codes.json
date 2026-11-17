@@ -1,0 +1,532 @@
+{
+ "A": {
+  "used_with": [],
+  "codes": {
+   "CustomUndefined": 0,
+   "Undefined": 4096,
+   "GetDeviceInfo": 4097,
+   "OpenSession": 4098,
+   "CloseSession": 4099,
+   "GetStorageIDs": 4100,
+   "GetStorageInfo": 4101,
+   "GetNumObjects": 4102,
+   "GetObjectHandles": 4103,
+   "GetObjectInfo": 4104,
+   "GetObject": 4105,
+   "GetThumb": 4106,
+   "DeleteObject": 4107,
+   "SendObjectInfo": 4108,
+   "SendObject": 4109,
+   "InitiateCapture": 4110,
+   "FormatStore": 4111,
+   "ResetDevice": 4112,
+   "SelfTest": 4113,
+   "SetObjectProtection": 4114,
+   "PowerDown": 4115,
+   "GetDevicePropDesc": 4116,
+   "GetDevicePropValue": 4117,
+   "SetDevicePropValue": 4118,
+   "ResetDevicePropValue": 4119,
+   "TerminateOpenCapture": 4120,
+   "MoveObject": 4121,
+   "CopyObject": 4122,
+   "GetPartialObject": 4123,
+   "InitiateOpenCapture": 4124,
+   "GetVendorExtensionMaps": 4128,
+   "GetVendorDeviceInfo": 4129,
+   "GetResizeImageObject": 4130,
+   "GetFileSystemManifest": 4131,
+   "GetStreamInfo": 4132,
+   "GetStream": 4133,
+   "LumixOpenSession": -28414,
+   "LumixCloseSession": -28413,
+   "LumixGetDeviceID": -28412,
+   "LumixGetTagListInfoSize": -28411,
+   "LumixGetTagListInfo": -28410,
+   "LumixGetCapabilityInfoSize": -28409,
+   "LumixGetCapabilityInfo": -28408,
+   "LumixGetParamNum": -28407,
+   "LumixGetParamInfoEx": -28406,
+   "LumixSetParamInfoEx": -28405,
+   "LumixExeParamInfoEx": -28404,
+   "LumixGetObjectInfo": -28400,
+   "LumixGetObject": -28399,
+   "LumixGetPartialObject": -28398,
+   "LumixSkipObjectTransfer": -28397,
+   "LumixGetStorageIDs": -28396,
+   "LumixGetStorageInfo": -28395,
+   "LumixSetEventTypeFromCamera": -28394,
+   "LumixStartObjectRW": -28393,
+   "LumixEndObjectRW": -28392,
+   "LumixGetAFInfo": -27647,
+   "LumixGetRecInfo": -27646,
+   "LumixSetRecInfo": -27645,
+   "LumixCtrlRecRelease": -27644,
+   "LumixCtrlRecAFAE": -27643,
+   "LumixCtrlSetup": -27642,
+   "LumixCtrl4KRec": -27641,
+   "LumixGetMovieInfo": -27640,
+   "LumixSetMovieInfo": -27639,
+   "LumixGetSetupInfo": -27638,
+   "LumixSetSetupInfo": -27637,
+   "LumixCtrlMovieRec": -27636,
+   "LumixCtrlPower": -27635,
+   "LumixCtrlPlaySingle": -27634,
+   "LumixCtrlPlayOther": -27633,
+   "LumixCtrlRecOther": -27632,
+   "LumixSendGPSData": -27631,
+   "LumixCtrlLiveView": -27630,
+   "LumixCtrlGet4KPhotoPict": -27629,
+   "LumixGetParamInfo": -27628,
+   "LumixSetParamInfo": -27627,
+   "LumixExeParamInfo": -27626,
+   "LumixGetNetworkInfo": -27625,
+   "LumixSetNetworkInfo": -27624,
+   "LumixCtrlMyPhotoStyle": -27623,
+   "LumixExportConfigFile": -27615,
+   "LumixImportConfigFile": -27614,
+   "LumixSaveConfigFile": -27613,
+   "LumixGetFromEventInfo": -27131,
+   "LumixSendDataInfo": -27130,
+   "LumixSendData": -27129,
+   "LumixGetStreamFrameData": -26873,
+   "LumixGetLiveViewData": -26874,
+   "LumixCtrlHSRAWLiveView": -26872,
+   "LumixGetHSRAWLiveViewData": -26871,
+   "LumixFlowGetRecInfo": -26367,
+   "LumixFlowStartXMLData": -26366,
+   "LumixFlowControlXMLData": -26365,
+   "LumixFlowSendXMLData": -26364,
+   "LumixFlowCtrlMoviePlay": -26363,
+   "LumixFlowGetMoviePlayData": -26362,
+   "LumixGallerySetCurrentSD": -26351,
+   "LumixGalleryGetListCount": -26350,
+   "LumixGalleryGetInfoList": -26349,
+   "LumixGalleryGetBurstInfoList": -26348,
+   "LumixGalleryGetThumbnail": -26347,
+   "LumixGalleryGetObjectStart": -26346,
+   "LumixGalleryGetObjectData": -26345,
+   "LumixControlCameraMode": -26344,
+   "LumixLutGetFileData": -26335,
+   "LumixLutStartFileData": -26334,
+   "LumixLutCancelFileData": -26333,
+   "LumixLutSendFileData": -26332,
+   "LumixSelectTransferGetInfoList": -26319,
+   "LumixSelectTransferGetData": -26318
+  }
+ },
+ "C": {
+  "used_with": [],
+  "codes": {
+   "Undefined": 8192,
+   "OK": 8193,
+   "GeneralError": 8194,
+   "SessionNotOpen": 8195,
+   "InvalidTransactionID": 8196,
+   "OperationNotSupported": 8197,
+   "ParameterNotSupported": 8198,
+   "IncompleteTransfer": 8199,
+   "InvalidStorageID": 8200,
+   "InvalidObjectHandle": 8201,
+   "DevicePropNotSupported": 8202,
+   "InvalidObjectFormatCode": 8203,
+   "StoreFull": 8204,
+   "ObjectWriteProtected": 8205,
+   "StoreReadOnly": 8206,
+   "AccessDenied": 8207,
+   "NoThumbnailPresent": 8208,
+   "SelfTestFailed": 8209,
+   "PartialDeletion": 8210,
+   "StoreNotAvailable": 8211,
+   "SpecificationByFormatUnsupported": 8212,
+   "NoValidObjectInfo": 8213,
+   "InvalidCodeFormat": 8214,
+   "UnknownVendorCode": 8215,
+   "CaptureAlreadyTerminated": 8216,
+   "DeviceBusy": 8217,
+   "InvalidParentObject": 8218,
+   "InvalidDevicePropFormat": 8219,
+   "InvalidDevicePropValue": 8220,
+   "InvalidParameter": 8221,
+   "SessionAlreadyOpen": 8222,
+   "TransactionCancelled": 8223,
+   "SpecificationOfDestinationUnsupported": 8224,
+   "InvalidEnumHandle": 8225,
+   "NoStreamEnabled": 8226,
+   "InvalidDataset": 8227,
+   "MyPhotoStyleEditErrorIA": -22271,
+   "MyPhotoStyleEditErrorHLG": -22270,
+   "MyhotoStyleEditErrorMOVHLG": -22269,
+   "MyhotoStyleEditErrorPRFULL": -22268,
+   "MyhotoStyleEditErrorMP4LogC3": -22267,
+   "MyhotoStyleEditErrorDB": -22266,
+   "MyhotoStyleEditErrorISO": -22265,
+   "MyhotoStyleEditErrorVLOG": -22264,
+   "MyhotoStyleEditErrorVLOGC3": -22263,
+   "MyhotoStyleEditErrorPHOTOHLG": -22262
+  }
+ },
+ "EnumC2170b": {
+  "used_with": [],
+  "codes": {
+   "UNDEF": 0,
+   "INT8": 1,
+   "UINT8": 2,
+   "INT16": 3,
+   "UINT16": 4,
+   "INT32": 5,
+   "UINT32": 6,
+   "INT64": 7,
+   "UINT64": 8,
+   "INT128": 9,
+   "UINT128": 10,
+   "AINT8": 16385,
+   "AUINT8": 16386,
+   "AINT16": 16387,
+   "AUINT16": 16388,
+   "AINT32": 16389,
+   "AUINT32": 16390,
+   "AINT64": 16391,
+   "AUINT64": 16392,
+   "AINT128": 16393,
+   "AUINT128": 16394,
+   "STR": -1
+  }
+ },
+ "d": {
+  "used_with": [],
+  "codes": {
+   "Undefined": 20480,
+   "BatteryLevel": 20481,
+   "FunctionalMode": 20482,
+   "ImageSize": 20483,
+   "CompressionSetting": 20484,
+   "WhiteBalance": 20485,
+   "RGBGain": 20486,
+   "FNumber": 20487,
+   "FocalLength": 20488,
+   "FocusDistance": 20489,
+   "FocusMode": 20490,
+   "ExposureMeteringMode": 20491,
+   "FlashMode": 20492,
+   "ExposureTime": 20493,
+   "ExposureProgramMode": 20494,
+   "ExposureIndex": 20495,
+   "ExposureBiasCompensation": 20496,
+   "DateTime": 20497,
+   "CaptureDelay": 20498,
+   "StillCaptureMode": 20499,
+   "Contrast": 20500,
+   "Sharpness": 20501,
+   "DigitalZoom": 20502,
+   "EffectMode": 20503,
+   "BurstNumber": 20504,
+   "BurstInterval": 20505,
+   "TimelapseNumber": 20506,
+   "TimelapseInterval": 20507,
+   "FocusMeteringMode": 20508,
+   "UploadURL": 20509,
+   "Artist": 20510,
+   "CopyrightInfo": 20511,
+   "SupportedStreams": 20512,
+   "EnabledStreams": 20513,
+   "VideoFormat": 20514,
+   "VideoResolution": 20515,
+   "VideoQuality": 20516,
+   "VideoFrameRate": 20517,
+   "VideoContrast": 20518,
+   "VideoBrightness": 20519,
+   "AudioFormat": 20520,
+   "AudioBitrate": 20521,
+   "AudioSamplingRate": 20522,
+   "AudioBitPerSample": 20523,
+   "AudioVolume": 20524
+  }
+ },
+ "f": {
+  "used_with": [],
+  "codes": {
+   "Undefined": 16384,
+   "CancelTransaction": 16385,
+   "ObjectAdded": 16386,
+   "ObjectRemoved": 16387,
+   "StoreAdded": 16388,
+   "StoreRemoved": 16389,
+   "DevicePropChanged": 16390,
+   "ObjectInfoChanged": 16391,
+   "DeviceInfoChanged": 16392,
+   "RequestObjectTransfer": 16393,
+   "StoreFull": 16394,
+   "DeviceReset": 16395,
+   "StorageInfoChanged": 16396,
+   "CaptureComplete": 16397,
+   "UnreportedStatus": 16398,
+   "LumixObjectAdd": -16120,
+   "LumixRequestObjectTransfer": -16119,
+   "LumixChangeAFInfo": -16127,
+   "LumixChangeRecInfo": -16126,
+   "LumixChangeMovieInfo": -16125,
+   "LumixChangeSetupInfo": -16124,
+   "LumixChangePlayInfo": -16123,
+   "Lumix4K6KDataReady": -16122,
+   "LumixChangeNotifyInfo": -16121,
+   "LumixNotifyFirmwareUpdate": -15871,
+   "LumixNotify_4K6KPhoto_Info": -15870,
+   "LumixNotifyFWUPProgress": -15869,
+   "LumixNotifyFWUPComplete": -15868,
+   "LumixNotifyExecComplete": -15867,
+   "LumixNotifyRecInfo": -15854,
+   "LumixNotifyMovieInfo": -15853,
+   "LumixNotifySetupInfo": -15852,
+   "LumixNotifyPlayInfo": -15851,
+   "LumixNotifyPowerInfo": -15850,
+   "LumixFlowObjectAdd": -15849,
+   "LumixFlowChangeInfo": -15848,
+   "LumixLutFileChangeInfo": -15847,
+   "LumixObjectTrasferMethod": -15840,
+   "LumixBluetoothSearchResult": -15839,
+   "LumixNotifyCameraMode": -15838,
+   "LumixNotifyMyphotostyleEditExit": -15837
+  }
+ },
+ "g": {
+  "used_with": [
+   "LumixGetParamInfo"
+  ],
+  "codes": {
+   "All": 301989904,
+   "CardStatus": 301989909
+  }
+ },
+ "h": {
+  "used_with": [
+   "LumixGetParamInfo",
+   "LumixSetParamInfo"
+  ],
+  "codes": {
+   "TransferCount": 1392508961,
+   "TransferNotifyResult": 1392508962
+  }
+ },
+ "j": {
+  "used_with": [
+   "LumixGetParamInfo"
+  ],
+  "codes": {
+   "All": 1358954544,
+   "CameraSerialNumber": 1358954545,
+   "DestinationSubInfo": 1358954548
+  }
+ },
+ "k": {
+  "used_with": [
+   "LumixGetParamInfo"
+  ],
+  "codes": {
+   "All": 302055520,
+   "LensName": 302055521,
+   "LensFirmwareVersion": 302055522,
+   "LensSerialNumber": 302055523
+  }
+ },
+ "l": {
+  "used_with": [],
+  "codes": {
+   "LiveViewStart": 218103824,
+   "LiveViewStop": 218103825
+  }
+ },
+ "m": {
+  "used_with": [
+   "LumixSetParamInfo"
+  ],
+  "codes": {
+   "SendImageQualitySetting": 226492433,
+   "RecommendImageQualityList": 226492434
+  }
+ },
+ "n": {
+  "used_with": [],
+  "codes": {
+   "JpegInfoHeader": 385875968,
+   "JpegOffsetInfo": 385875969,
+   "JpegSizeInfo": 385875970,
+   "HistogramInfo": 385875971,
+   "RotationInfo": 385875972,
+   "LevelInfo": 385875973,
+   "AudioLevel": 385875974
+  }
+ },
+ "o": {
+  "used_with": [
+   "LumixGetParamInfo",
+   "LumixLutGetFileData",
+   "LumixSetParamInfo"
+  ],
+  "codes": {
+   "GetLutInfo": 1392508945,
+   "GetLUTFile": 1392508946,
+   "RenameLUTFile": 1392508947,
+   "DeleteLUTFile": 1392508948,
+   "SortLUTFile": 1392508949,
+   "DisplaySetting": 1392508950
+  }
+ },
+ "p": {
+  "used_with": [
+   "LumixCtrlMyPhotoStyle"
+  ],
+  "codes": {
+   "StartEdit": 50397249,
+   "EndEdit": 50397250,
+   "Sort": 50397251,
+   "Reset": 50397252,
+   "DefaultReset": 50397253
+  }
+ },
+ "q": {
+  "used_with": [
+   "LumixGetRecInfo",
+   "LumixSetRecInfo"
+  ],
+  "codes": {
+   "All": 33554976,
+   "MyPhotoStyleDisplaySetting": 33554977,
+   "PhotoStyleDisplaySetting": 33554978,
+   "MyPhotoStyleSelectSetting": 33554979,
+   "MyPhotoStyleRegistrationSetting": 33554980,
+   "ISOValueDisplaySetting": 33554981,
+   "WBValueDisplaySetting": 33554982,
+   "CallMyPhotoStyleChange": 33554983,
+   "CallSleepModeSetting": 33554984,
+   "CallPowerSWSetting": 33554985,
+   "Rename": 33554986
+  }
+ },
+ "r": {
+  "used_with": [
+   "LumixSetParamInfo"
+  ],
+  "codes": {
+   "UuidSearch": 1392508977,
+   "PairingOperation": 1392508978,
+   "ConnectedDeviceNameNotify": 1392508979
+  }
+ },
+ "s": {
+  "used_with": [
+   "LumixGetRecInfo",
+   "LumixSetRecInfo"
+  ],
+  "codes": {
+   "All": 33554928,
+   "DualNativeISO": 33554929,
+   "ColorNoise": 33554930,
+   "Lut1": 33554931,
+   "MasterPoint": 33554932,
+   "MasterSlope": 33554933,
+   "Gain": 33554934,
+   "BasePhotoStyle": 33554935,
+   "Lut2": 33554936,
+   "Concentration1": 33554937,
+   "Concentration2": 33554938,
+   "Lut1RegistrationInformation": 33554939,
+   "Lut2RegistrationInformation": 33554940
+  }
+ },
+ "t": {
+  "used_with": [
+   "LumixSetRecInfo"
+  ],
+  "codes": {
+   "All": 33554448,
+   "StyleMode": 33554449,
+   "Contrast": 33554450,
+   "Sharpness": 33554451,
+   "NoiseReduction": 33554452,
+   "Saturation": 33554453,
+   "Filter": 33554454,
+   "Hue": 33554455,
+   "Granulation": 33554456,
+   "KneeMode": 33554457,
+   "Color": 33554458,
+   "Highlight": 33554459,
+   "Shadow": 33554460,
+   "ISO": 33554461,
+   "WB": 33554462,
+   "PhotoStyle": 33554463
+  }
+ },
+ "u": {
+  "used_with": [],
+  "codes": {
+   "All": 33554464,
+   "ISOValue": 33554465,
+   "ISOMaximum": 33554466,
+   "ISOSensitivity": 33554467,
+   "ExtendedISOSensitivity": 33554468,
+   "GainValue": 33554469
+  }
+ },
+ "v": {
+  "used_with": [],
+  "codes": {
+   "All": 33554512,
+   "WBValue": 33554513,
+   "WBColorTemperature": 33554514,
+   "WBAxisValueAB": 33554515,
+   "WBAxisValueGM": 33554516,
+   "IModeAdjust": 33554517
+  }
+ },
+ "w": {
+  "used_with": [
+   "LumixGetSetupInfo",
+   "LumixSetSetupInfo"
+  ],
+  "codes": {
+   "All": 134217744,
+   "TimeSetting": 134217745,
+   "HomeSetting": 134217748,
+   "LocationInformationSetting": 134217756
+  }
+ },
+ "y": {
+  "used_with": [],
+  "codes": {
+   "Undefined_0": 12288,
+   "Association": 12289,
+   "Script": 12290,
+   "Executable": 12291,
+   "Text": 12292,
+   "HTML": 12293,
+   "DPOF": 12294,
+   "AIFF": 12295,
+   "WAV": 12296,
+   "MP3": 12297,
+   "AVI": 12298,
+   "MPEG": 12299,
+   "ASF": 12300,
+   "QuickTime": 12301,
+   "XML": 12302,
+   "Undefined_1": 14336,
+   "Exif_JPEG": 14337,
+   "TIFF_EP": 14338,
+   "FlashPix": 14339,
+   "BMP": 14340,
+   "CIFF": 14341,
+   "Undefined_2": 14342,
+   "GIF": 14343,
+   "JFIF": 14344,
+   "PCD": 14345,
+   "PICT": 14346,
+   "PNG": 14347,
+   "Undefined_3": 14348,
+   "TIFF": 14349,
+   "TIFF_IT": 14350,
+   "JP2": 14351,
+   "JPX": 14352,
+   "DNG": 14353
+  }
+ }
+}

@@ -80,7 +80,10 @@ What we learned building this, including the mistakes, so nobody has to repeat t
 - **Active LUT selection is not exposed over PTP** (as far as tested; also tried: select style 0x02000223 + My Photo
   Style edit session + 0x020001FB, on style 49 and on MY PHOTO STYLE 1 — accepted, ignored): switching the LUT on the camera changes none of
   the single properties nor the 0x020001F0/0x02000220/0x02000010 blocks; writing 0x020001FB (alone or inside the
-  My Photo Style edit session 0x9419 StartEdit/EndEdit) is accepted but ignored. Next step would be recording LUMIX Lab.
+  My Photo Style edit session 0x9419 StartEdit/EndEdit) is accepted but ignored; also with 0x020001F3 (LUT 1 on/off)
+  re-applied after it. **LUMIX Lab 3.1.0 offers no way to switch the active LUT either**: its UI texts only cover
+  transferring LUTs and placing them in the library ("the settings are applied the next time you select this LUT" on
+  the camera). Treat active-LUT selection as camera-only.
 - LUT upload/rename/sort/delete also work in **PC (Tether)** USB mode (04da:2382); no need to switch to LUMIX Lab mode.
   In tether mode GetLutInfo records are **262 bytes** (id, name, style, type) instead of 272 (no grain/noise/visibility
   fields); the parser detects it from the size field.

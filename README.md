@@ -48,10 +48,12 @@ operations are blocked in the transport. Tests: `python tests/test_offline.py`, 
 `apps/LumixOS` is a SwiftUI app: low-latency live view (1280x960 @ 30 fps, newest frame only) with a camera-style
 HUD over the picture: WB/Kelvin, Photo Style (+ LUT opacity), quality on top; mode, aperture, EV, ISO, shutter,
 remaining shots and battery at the bottom; grid, centre cross, level line, optional histogram. Hover a value to open
-its options, click to set it. Focus: AF (f), focus mode AFS/AFC/MF in the HUD, and in MF a focus strip (press to
-nudge, hold to drive), `[` `]` keys (`{` `}` fast) or the scroll wheel. Keys: space shutter, g grid, l level,
-h histogram, s settings panel. **Camera** menu: install the "LumixOS Camera" virtual camera (needs an Apple Developer
-team, see apps/LumixOS/README.md) or copy the stream URL for OBS.
+its options, click to set it. Focus: click the picture for touch AF (moves the AF area there and focuses), AF (f), focus
+mode AFS/AFC/MF in the HUD, an MF ring on the right (drag up = far; grabbing it switches to MF), `[` `]` keys
+(`{` `}` fast) or the scroll wheel. Aperture lists real 1/3 stops only. Keys: space shutter, g grid, l level,
+h histogram, s settings panel. **Camera** menu: send the live view into **OBS Virtual Camera** (no signing needed: LumixOS
+feeds the sink of OBS's own camera extension; OBS needn't run), install the own "LumixOS Camera" extension (needs an
+Apple Developer team, see apps/LumixOS/README.md) or copy the stream URL for OBS.
 Errors (no camera, unplugged, camera held by another program, live view refused, service crash) are shown on the
 picture with a Retry button; the app restarts the service if it dies (log: `~/Library/Logs/LumixOS/server.log`).
 

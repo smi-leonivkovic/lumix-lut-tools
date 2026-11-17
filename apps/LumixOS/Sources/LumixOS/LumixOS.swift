@@ -116,6 +116,14 @@ final class Backend: ObservableObject {
     }
 }
 
+let obsFeed = OBSCameraFeed()
+
+/// Camera menu action: send the live view to OBS's virtual camera (remembered across launches).
+@MainActor func setOBSFeed(_ on: Bool) {
+    UserDefaults.standard.set(on, forKey: "obsFeed")
+    on ? obsFeed.start() : obsFeed.stop()
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ n: Notification) {
         MainActor.assumeIsolated { Backend.shared.start() }
@@ -139,6 +147,7 @@ final class LiveStream: NSObject, ObservableObject, URLSessionDataDelegate {
     private let decodeQueue = DispatchQueue(label: "decode", qos: .userInteractive)
     private let lock = NSLock()
     private var decoding = false
+    var onFrame: ((CGImage) -> Void)?  // every decoded frame (decode queue), e.g. for the OBS virtual camera
 
     func connect() {
         buffer.removeAll()
@@ -184,6 +193,7 @@ final class LiveStream: NSObject, ObservableObject, URLSessionDataDelegate {
             let img = CGImageSourceCreateWithData(jpg as CFData, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, opts) }
             self.lock.lock(); self.decoding = false; self.lock.unlock()
             guard let img else { return }  // broken JPEG: skip it
+            self.onFrame?(img)
             DispatchQueue.main.async {
                 self.image = img
                 self.lastFrameAt = Date()
@@ -212,7 +222,15 @@ struct CameraInfo: Decodable {
     var firmware: String
 }
 
+struct AFFrame: Decodable, Equatable {
+    var x: Int
+    var y: Int
+    var w: Int
+    var h: Int
+}
+
 struct HUDData: Decodable {
+    var af_frame: AFFrame?
     var battery: Int?
     var shots: Int?
     var mode: String?
@@ -279,17 +297,20 @@ final class CameraModel: ObservableObject {
     }
 
     func focus(_ step: String, ms: Int = 150) {
-        post("focus", ["step": step, "ms": String(ms)], quiet: true)
+        post("focus", ["step": step, "ms": ms], quiet: true)
     }
 
-    func post(_ path: String, _ body: [String: String] = [:], quiet: Bool = false) {
+    /// Touch AF: move the AF area to (x, y) in 0..1000 and focus there.
+    func touch(x: Double, y: Double) {
+        post("touch", ["x": Int(x.rounded()), "y": Int(y.rounded()), "af": true], quiet: true)
+    }
+
+    func post(_ path: String, _ body: [String: Any] = [:], quiet: Bool = false) {
         var req = URLRequest(url: serverURL.appendingPathComponent(path))
         req.httpMethod = "POST"
         req.timeoutInterval = 12
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        var json: [String: Any] = body
-        if let ms = body["ms"], let v = Int(ms) { json["ms"] = v }
-        req.httpBody = try? JSONSerialization.data(withJSONObject: json)
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
         Task {
             do {
                 let (data, r) = try await URLSession.shared.data(for: req)
@@ -342,7 +363,7 @@ enum Fmt {
     static func ev(_ label: String) -> String {
         guard let v = Double(label.replacingOccurrences(of: " EV", with: "")) else { return label }
         let t = Int((v * 3).rounded())
-        if t == 0 { return "±0" }
+        if t == 0 { return "0" }
         let a = abs(t), w = a / 3, f = a % 3
         return (t < 0 ? "-" : "+") + (w > 0 ? "\(w)" : "") + (f > 0 ? (w > 0 ? " " : "") + "\(f)/3" : "")
     }
@@ -357,14 +378,20 @@ final class HoverMenu: ObservableObject {
     @Published var open: String?
     private var closeWork: DispatchWorkItem?
 
-    func enter(_ id: String) { closeWork?.cancel(); open = id }
+    func enter(_ id: String) {
+        closeWork?.cancel()
+        if open != id { withAnimation(menuSpring) { open = id } }
+    }
     func leave(_ id: String) {
         closeWork?.cancel()
-        let w = DispatchWorkItem { [weak self] in if self?.open == id { self?.open = nil } }
+        let w = DispatchWorkItem { [weak self] in
+            if self?.open == id { withAnimation(.easeOut(duration: 0.14)) { self?.open = nil } }
+        }
         closeWork = w
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: w)
     }
-    func toggle(_ id: String) { closeWork?.cancel(); open = open == id ? nil : id }
+    func toggle(_ id: String) { closeWork?.cancel(); withAnimation(menuSpring) { open = open == id ? nil : id } }
+    func close() { closeWork?.cancel(); withAnimation(.easeOut(duration: 0.14)) { open = nil } }
 }
 
 struct MenuColumn: Identifiable {
@@ -374,6 +401,26 @@ struct MenuColumn: Identifiable {
 }
 
 let panasonicYellow = Color(red: 1.0, green: 0.82, blue: 0.0)
+let menuSpring = Animation.spring(response: 0.28, dampingFraction: 0.82)
+
+extension View {
+    /// Liquid Glass on macOS 26+, material before.
+    @ViewBuilder func glass<S: Shape>(_ shape: S, tint: Color? = nil, interactive: Bool = false) -> some View {
+        if #available(macOS 26.0, *) {
+            self.glassEffect(interactive ? Glass.regular.tint(tint).interactive() : Glass.regular.tint(tint), in: shape)
+        } else {
+            self.background(.ultraThinMaterial, in: shape)
+        }
+    }
+
+    @ViewBuilder func glassButtonStyle(prominent: Bool = false) -> some View {
+        if #available(macOS 26.0, *) {
+            if prominent { self.buttonStyle(.glassProminent) } else { self.buttonStyle(.glass) }
+        } else {
+            self.buttonStyle(.bordered)
+        }
+    }
+}
 
 /// One value on the HUD. Hover (or click) opens its option columns; clicking an option sets it.
 struct HUDItem<Label: View>: View {
@@ -407,10 +454,13 @@ struct HUDItem<Label: View>: View {
             .overlay(alignment: opensDown ? .topLeading : .bottomLeading) {
                 if isOpen {
                     menu
-                        .alignmentGuide(.top) { _ in -(itemHeight + 4) }
-                        .alignmentGuide(.bottom) { d in d.height + itemHeight + 4 }
                         .onHover { inside in inside ? hover.enter(id) : hover.leave(id) }
-                        .transition(.opacity)
+                        .offset(y: opensDown ? itemHeight + 6 : -(itemHeight + 6))
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.86, anchor: opensDown ? .topLeading : .bottomLeading)
+                                .combined(with: .opacity)
+                                .combined(with: .offset(y: opensDown ? -8 : 8)),
+                            removal: .opacity.combined(with: .scale(scale: 0.96, anchor: opensDown ? .topLeading : .bottomLeading))))
                 }
             }
             .zIndex(isOpen ? 10 : 0)
@@ -501,10 +551,12 @@ struct CameraHUD: View {
                 }
                 .padding(.horizontal, fs * 0.6)
                 Spacer()
-                if cur["focus_mode"] == "MF" {
-                    HStack { Spacer(); focusStrip }.padding(.trailing, fs * 0.6)
+                HStack {
                     Spacer()
+                    FocusRing(fs: fs, height: size.height * 0.38, camera: camera)
                 }
+                .padding(.trailing, fs * 0.7)
+                Spacer()
                 bottomBar.zIndex(hover.open?.hasPrefix("bottom") == true ? 2 : 1)
             }
         }
@@ -588,21 +640,6 @@ struct CameraHUD: View {
         .padding(.bottom, fs * 0.35)
     }
 
-    /// MF drive: press for a nudge, hold to keep driving. Also [ ] keys ({ } fast) and the scroll wheel.
-    var focusStrip: some View {
-        VStack(spacing: fs * 0.3) {
-            Text("FAR").font(.system(size: fs * 0.55, weight: .bold)).foregroundStyle(.white.opacity(0.7))
-            FocusButton(symbol: "chevron.up.2", step: "far_fast", fs: fs, camera: camera)
-            FocusButton(symbol: "chevron.up", step: "far_slow", fs: fs, camera: camera)
-            FocusButton(symbol: "chevron.down", step: "near_slow", fs: fs, camera: camera)
-            FocusButton(symbol: "chevron.down.2", step: "near_fast", fs: fs, camera: camera)
-            Text("NEAR").font(.system(size: fs * 0.55, weight: .bold)).foregroundStyle(.white.opacity(0.7))
-        }
-        .padding(fs * 0.3)
-        .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: fs * 0.4))
-        .help("Manual focus: press to nudge, hold to drive. Keys [ ] (with shift: fast), or scroll over the picture.")
-    }
-
     func boxed(_ s: String) -> some View {
         Text(s)
             .font(.system(size: fs * 0.72, weight: .heavy, design: .rounded))
@@ -670,32 +707,104 @@ struct CameraHUD: View {
     }
 }
 
-struct FocusButton: View {
-    let symbol: String
-    let step: String
-    let fs: CGFloat
-    @ObservedObject var camera: CameraModel
-    @State private var timer: Timer?
+/// AF point like the camera's: yellow and slightly larger while focusing, then white.
+struct AFPointBox: View {
+    let active: Bool
+    let side: CGFloat
 
     var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: fs * 0.9, weight: .bold))
-            .foregroundStyle(timer == nil ? .white : panasonicYellow)
-            .frame(width: fs * 2, height: fs * 1.6)
-            .background(Color.white.opacity(timer == nil ? 0.08 : 0.25), in: RoundedRectangle(cornerRadius: fs * 0.3))
-            .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    guard timer == nil else { return }
-                    camera.focus(step, ms: 260)
-                    timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { _ in
-                        Task { @MainActor in camera.focus(step, ms: 260) }
-                    }
+        let c = side * 0.28
+        Path { p in
+            for (x, y, dx, dy) in [(0.0, 0.0, 1.0, 1.0), (side, 0, -1, 1), (0, side, 1, -1), (side, side, -1, -1)] {
+                p.move(to: CGPoint(x: x + dx * c, y: y)); p.addLine(to: CGPoint(x: x, y: y))
+                p.addLine(to: CGPoint(x: x, y: y + dy * c))
+            }
+        }
+        .stroke(active ? panasonicYellow : .white, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+        .frame(width: side, height: side)
+        .shadow(color: .black.opacity(0.7), radius: 1)
+        .scaleEffect(active ? 1.15 : 1)
+    }
+}
+
+/// Virtual MF ring: drag up = far, down = near; faster drags drive faster. Grabbing it in AF switches to MF.
+struct FocusRing: View {
+    let fs: CGFloat
+    let height: CGFloat
+    @ObservedObject var camera: CameraModel
+    @State private var phase: CGFloat = 0
+    @State private var lastY: CGFloat?
+    @State private var pending: CGFloat = 0
+    @State private var lastSend = Date.distantPast
+    @State private var grabbed = false
+
+    var isMF: Bool { camera.state?.current["focus_mode"] == "MF" }
+
+    var body: some View {
+        let w = fs * 2.1
+        VStack(spacing: fs * 0.35) {
+            Text("∞").font(.system(size: fs * 0.8, weight: .bold, design: .rounded))
+            ring(width: w)
+            Text("NEAR").font(.system(size: fs * 0.5, weight: .heavy, design: .rounded))
+            Text("MF").font(.system(size: fs * 0.55, weight: .heavy, design: .rounded))
+                .padding(.horizontal, 4).padding(.vertical, 1)
+                .overlay(RoundedRectangle(cornerRadius: 2).stroke(lineWidth: 1.1))
+                .opacity(isMF ? 1 : 0.45)
+        }
+        .foregroundStyle(.white)
+        .shadow(color: .black.opacity(0.8), radius: 1)
+        .help("MF ring: drag up for far, down for near (faster = faster). Grabbing it switches the camera to MF. "
+              + "Also [ ] keys ({ } fast) and the scroll wheel.")
+    }
+
+    func ring(width w: CGFloat) -> some View {
+        let gap = max(5, fs * 0.38)
+        return Canvas { ctx, size in
+            var y = phase.truncatingRemainder(dividingBy: gap)
+            if y < 0 { y += gap }
+            while y < size.height {
+                let t = y / size.height  // cylinder shading: ridges fade and thin towards the ends
+                let shade = sin(t * .pi)
+                var p = Path()
+                p.move(to: CGPoint(x: w * 0.18, y: y)); p.addLine(to: CGPoint(x: w * 0.82, y: y))
+                ctx.stroke(p, with: .color(.white.opacity(0.15 + 0.55 * shade)), lineWidth: 0.8 + 1.4 * shade)
+                y += gap
+            }
+        }
+        .frame(width: w, height: height)
+        .overlay(LinearGradient(colors: [.black.opacity(0.45), .clear, .clear, .black.opacity(0.45)],
+                                startPoint: .top, endPoint: .bottom).allowsHitTesting(false))
+        .clipShape(Capsule())
+        .glass(Capsule(), tint: grabbed ? panasonicYellow.opacity(0.3) : nil, interactive: true)
+        .scaleEffect(grabbed ? 1.04 : 1)
+        .animation(.spring(response: 0.25, dampingFraction: 0.75), value: grabbed)
+        .contentShape(Capsule())
+        .gesture(DragGesture(minimumDistance: 0)
+            .onChanged { v in
+                if !grabbed {
+                    grabbed = true
+                    if !isMF { camera.set("focus_mode", "MF") }
                 }
-                .onEnded { _ in
-                    timer?.invalidate(); timer = nil
-                    camera.focus("stop")
-                })
+                let y = v.location.y
+                let dy = y - (lastY ?? y)
+                lastY = y
+                phase += dy
+                pending += dy
+                let dt = Date().timeIntervalSince(lastSend)
+                if dt > 0.07, abs(pending) >= 1 {
+                    let speed = abs(pending) / CGFloat(min(dt, 0.25))  // points per second
+                    let step = (pending < 0 ? "far" : "near") + (speed > 220 ? "_fast" : "_slow")
+                    camera.focus(step, ms: 160)
+                    pending = 0
+                    lastSend = Date()
+                }
+            }
+            .onEnded { _ in
+                grabbed = false
+                lastY = nil
+                pending = 0
+                camera.focus("stop")
+            })
     }
 }
 
@@ -717,6 +826,8 @@ struct ContentView: View {
     @State var showHistogram = false
     @StateObject var hover = HoverMenu()
     @State var lastScroll = Date.distantPast
+    @State var touchPoint: CGPoint?  // last touch AF point, 0..1 of the picture
+    @State var touchActive = false
 
     var body: some View {
         GeometryReader { geo in
@@ -733,7 +844,20 @@ struct ContentView: View {
         }
         .frame(minWidth: 560, minHeight: 440)
         .background(Color.black)
-        .onAppear { stream.connect(); camera.startPolling() }
+        .onAppear {
+            stream.onFrame = { obsFeed.send($0) }
+            obsFeed.onStatus = { error, running in
+                if let error {
+                    UserDefaults.standard.set(false, forKey: "obsFeed")
+                    VirtualCamera.shared.alert("OBS Virtual Camera", error)
+                } else {
+                    camera.show(running ? "Live view → OBS Virtual Camera" : "Stopped sending to OBS Virtual Camera", error: false)
+                }
+            }
+            stream.connect()
+            camera.startPolling()
+            if UserDefaults.standard.bool(forKey: "obsFeed") { obsFeed.start() }
+        }
         .background(KeyCatcher(onKey: key, onScroll: scroll))
         .toolbar {
             ToolbarItemGroup {
@@ -774,6 +898,22 @@ struct ContentView: View {
                             Image(decorative: img, scale: 1).resizable().interpolation(.medium)
                                 .frame(width: fit.width, height: fit.height)
                                 .opacity(problem == nil ? 1 : 0.35)
+                                .contentShape(Rectangle())
+                                .onTapGesture(coordinateSpace: .local) { p in
+                                    guard problem == nil else { return }
+                                    hover.close()
+                                    let n = CGPoint(x: p.x / fit.width, y: p.y / fit.height)
+                                    camera.touch(x: n.x * 1000, y: n.y * 1000)
+                                    withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) { touchPoint = n; touchActive = true }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+                                        if touchPoint == n { withAnimation(.easeOut(duration: 0.3)) { touchActive = false } }
+                                    }
+                                }
+                        }
+                        if let m = touchPoint {
+                            AFPointBox(active: touchActive, side: fit.width * 0.09)
+                                .position(x: m.x * fit.width, y: m.y * fit.height)
+                                .allowsHitTesting(false)
                         }
                         CameraHUD(camera: camera, hover: hover, size: fit, showGrid: showGrid, showLevel: showLevel, showHistogram: showHistogram)
                         if let p = problem { problemCard(p.text, busy: p.busy) }
@@ -799,14 +939,15 @@ struct ContentView: View {
                 .textSelection(.enabled)
             if !busy {
                 HStack {
-                    Button("Retry") { backend.retry(); Task { await camera.refresh() } }
-                    Button("Open log") { backend.openLog() }
+                    Button("Retry") { backend.retry(); Task { await camera.refresh() } }.glassButtonStyle(prominent: true)
+                    Button("Open log") { backend.openLog() }.glassButtonStyle()
                 }
             }
         }
-        .padding(18)
+        .padding(20)
         .frame(maxWidth: 420)
-        .background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 12))
+        .glass(RoundedRectangle(cornerRadius: 22), tint: .black.opacity(0.35))
+        .transition(.scale(scale: 0.94).combined(with: .opacity))
     }
 
     func noticeView(_ n: Notice, fs: CGFloat) -> some View {
@@ -818,8 +959,9 @@ struct ContentView: View {
             }
             .font(.system(size: fs, weight: .medium))
             .padding(.horizontal, 12).padding(.vertical, 7)
-            .background((n.isError ? Color.red.opacity(0.35) : Color.black.opacity(0.7)), in: Capsule())
+            .glass(Capsule(), tint: n.isError ? Color.red.opacity(0.45) : Color.black.opacity(0.3))
             .padding(.bottom, fs * 3)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
         }
         .allowsHitTesting(false)
         .animation(.easeOut(duration: 0.15), value: n)
@@ -848,8 +990,8 @@ struct ContentView: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), alignment: .topLeading)], alignment: .leading, spacing: 10) {
                 panelHeader
                 HStack {
-                    Button("AF  (f)") { camera.post("af") }
-                    Button("Shutter  (space)") { camera.post("shutter") }
+                    Button("AF  (f)") { camera.post("af") }.glassButtonStyle()
+                    Button("Shutter  (space)") { camera.post("shutter") }.glassButtonStyle(prominent: true)
                 }
                 if let s = camera.state {
                     ForEach(settingOrder, id: \.0) { key, label in
@@ -865,13 +1007,14 @@ struct ContentView: View {
                         ForEach(["640x480", "960x720", "1280x960"], id: \.self) { Text($0).tag($0) }
                     }
                 }
-                Button("Undo all changes") { camera.post("undo") }
+                Button("Undo all changes") { camera.post("undo") }.glassButtonStyle()
                 Text("P/A/S/M and the active LUT are chosen on the camera.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
-            .padding(14)
+            .padding(16)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .glass(RoundedRectangle(cornerRadius: 20))
+        .padding(8)
     }
 
     /// Scroll wheel over the window drives MF (not while a HUD menu is open: it scrolls the list then).
@@ -943,7 +1086,10 @@ struct LumixOSApp: App {
             .defaultSize(width: 1100, height: 860)
             .commands {
                 CommandMenu("Camera") {
-                    Button("Install LumixOS Camera (for Zoom, Meet, OBS…)") { VirtualCamera.shared.install() }
+                    Button("Send Live View to OBS Virtual Camera") { setOBSFeed(true) }
+                    Button("Stop Sending to OBS Virtual Camera") { setOBSFeed(false) }
+                    Divider()
+                    Button("Install LumixOS Camera (needs Developer team)") { VirtualCamera.shared.install() }
                     Button("Remove LumixOS Camera") { VirtualCamera.shared.remove() }
                     Divider()
                     Button("Copy Stream URL (OBS Media Source)") {

@@ -30,6 +30,9 @@ WB_MODES = {'auto': 0x0002, 'daylight': 0x0004, 'fluorescent': 0x0005, 'tungsten
             'cloudy': 0x8008, 'white_set': 0x8009, 'shade': 0x800F, 'kelvin': 0x8010, 'kelvin2': 0x8011,
             'kelvin3': 0x8012, 'kelvin4': 0x8013, 'auto_cool': 0x8014, 'auto_warm': 0x8015}
 FOCUS_MODES = {'AFS': 4, 'AFC': 5, 'MF': 3}  # DC-S9: 5 = AFC (camera screen), 3 = MF (MF drive works); 4 assumed AFS
+# 1/3-stop f-number scale (x10) as cameras display it
+APERTURE_THIRDS = {10, 11, 12, 14, 16, 18, 20, 22, 25, 28, 32, 35, 40, 45, 50, 56, 63, 71, 80, 90, 100, 110, 130, 140,
+                   160, 180, 200, 220, 250, 290, 320, 360, 400, 450}
 IMAGE_FORMATS = {'raw': 3, 'raw+jpeg': 4}
 ISO_AUTO = 0xFFFFFFFF
 
@@ -133,7 +136,10 @@ def options(cam):
     out['white_balance'] = [(n, v) for n, v in WB_MODES.items() if v in set(lst('white_balance'))]
     out['iso'] = [('auto' if v == ISO_AUTO else str(v), v) for v in lst('iso') if v == ISO_AUTO or v < 0x10000000]
     out['exposure_comp'] = sorted(((f'{ev_decode(v):+g} EV', v) for v in lst('exposure_comp')), key=lambda x: ev_decode(x[1]))
-    out['aperture'] = [(f'f/{v / 10:g}', v) for v in lst('aperture')]
+    av = lst('aperture')  # the camera lists every 0.1 (f/2, 2.1, 2.2 ...): keep the real 1/3-stop scale
+    cur_av = get(cam, PROPS['aperture'][0])
+    out['aperture'] = [(f'f/{v / 10:g}', v) for v in sorted(av)
+                       if v in APERTURE_THIRDS or v == min(av) or v == cur_av]
     out['shutter'] = [(shutter_label(v), v) for v in lst('shutter')]
     out['image_format'] = [(n, v) for n, v in IMAGE_FORMATS.items()]
     fm = set(lst('focus_mode'))

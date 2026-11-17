@@ -10,6 +10,7 @@ GET  /state         JSON: phase (connecting|live|error), status, error, camera (
                     timings, frame_age_ms, hud (battery, shots, mode, shutter, level, histogram), options (labels the camera offers), current values (labels)
 POST /set           JSON {"key": ..., "label": ...}   (labels as listed in /state options)
 POST /af, /shutter, /undo, /size {"size": "1280x960"}
+POST /touch        {"x": 0..1000, "y": 0..1000, "af": true}  move the AF area (touch AF), then AF once
 POST /focus        {"step": near_fast|near_slow|far_slow|far_fast|stop, "ms": 120}  MF drive pulse (focus mode MF)
 Commands wait for the camera (up to 8 s) and answer {"ok": true, "message"} or {"ok": false, "error"} (4xx/5xx).
 Binds to 127.0.0.1 only. Exit code 2 if the port is taken. SIGTERM stops live view cleanly before exiting.
@@ -74,7 +75,7 @@ class CameraService:
         self.phase, self.status, self.error = 'connecting', 'connecting to camera…', None
         self.fps, self.t_fetch = 0.0, 0.0
         self.camera = None  # {'manufacturer', 'model', 'firmware'} of the connected camera
-        self.hud, self.header = {}, {}  # camera-screen values; live view header (histogram, level)
+        self.hud, self.header, self.af = {}, {}, None  # camera-screen values; live view header (histogram, level)
         self.mf_stop_at = None  # time when a focus drive pulse ends
         self.running = True
         self.stopped = threading.Event()
@@ -103,7 +104,7 @@ class CameraService:
                         print(f'live view size not set: {e}', file=sys.stderr, flush=True)
                     liveview.start(cam)
                     self.phase, self.status, self.error, delay = 'live', 'live', None, 1.0
-                    n, t_fps, t_read = 0, time.time(), time.time()
+                    n, t_fps, t_read, t_af = 0, time.time(), time.time(), 0.0
                     try:
                         while self.running:
                             self.handle_cmds(cam)
@@ -116,9 +117,6 @@ class CameraService:
                             jpg, hdr = liveview.frame(cam)
                             self.t_fetch = time.perf_counter() - t0
                             self.header = liveview.parse_header(hdr)
-                            with self.cond:
-                                self.jpg, self.seq, self.t_frame = jpg, self.seq + 1, time.time()
-                                self.cond.notify_all()
                             n += 1
                             if time.time() - t_fps >= 1:
                                 self.fps, n, t_fps = n / (time.time() - t_fps), 0, time.time()
@@ -182,6 +180,14 @@ class CameraService:
                 return False, f'focus drive refused (0x{rc:04x})'
             self.mf_stop_at = time.time() + ms / 1000 if step != 'stop' else None
             return True, f'focus {step.replace("_", " ")}'
+        if w[0] == 'touch':
+            rc = liveview.touch_af(cam, w[1], w[2])
+            if rc != 0x2001:
+                return False, f'AF area not moved (0x{rc:04x}; AF area mode doesn\'t allow it, or MF?)'
+            if w[3]:
+                rc = liveview.autofocus(cam)
+                return rc == 0x2001, 'focus here' if rc == 0x2001 else f'AF area moved, AF failed (0x{rc:04x})'
+            return True, 'AF area moved'
         if w[0] == 'set':
             settings.write(cam, w[1], w[2])
             return True, f'{w[1].replace("_", " ")} = {settings.label_of(self.opts, w[1], w[2])}'
@@ -232,7 +238,8 @@ class CameraService:
                 'fps': round(self.fps, 1) if live else 0.0, 'fetch_ms': round(self.t_fetch * 1000, 1),
                 'frame_age_ms': round((time.time() - self.t_frame) * 1000) if self.t_frame else None,
                 'size': f'{self.size[0]}x{self.size[1]}',
-                'hud': {**self.hud, **({k: self.header[k] for k in ('level', 'histogram') if k in self.header} if live else {})},
+                'hud': {**self.hud, **({k: self.header[k] for k in ('level', 'histogram') if k in self.header} if live else {}),
+},
                 'options': {k: [l for l, _ in v] for k, v in self.opts.items()},
                 'current': {k: settings.label_of(self.opts, k, v) for k, v in self.current.items() if v is not None}}
 
@@ -323,6 +330,14 @@ def make_handler(svc):
                     except (TypeError, ValueError):
                         return self.send(400, {'ok': False, 'error': 'ms must be a number'})
                     ok, msg = svc.submit(('focus', step, ms))
+                elif self.path == '/touch':
+                    try:
+                        x, y = float(body['x']), float(body['y'])
+                    except (KeyError, TypeError, ValueError):
+                        return self.send(400, {'ok': False, 'error': 'x and y (0..1000) are required'})
+                    if not (0 <= x <= 1000 and 0 <= y <= 1000):
+                        return self.send(400, {'ok': False, 'error': 'x and y must be within 0..1000'})
+                    ok, msg = svc.submit(('touch', x, y, bool(body.get('af', True))))
                 elif self.path == '/size':
                     size = body.get('size', '1280x960')
                     if size not in SIZES:

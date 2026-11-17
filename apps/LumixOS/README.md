@@ -5,6 +5,13 @@ Native macOS live view and control for a LUMIX camera on USB (PC (Tether) mode).
 Build: `./build_app.sh` → `LumixOS.app` (ad-hoc signed). Copy it to /Applications. It starts the camera service from
 the repo's `.venv` (`LUMIX_REPO` overrides); log: `~/Library/Logs/LumixOS/server.log`.
 
+## Virtual camera without signing: OBS Virtual Camera
+
+OBS (30+) ships a signed CoreMediaIO extension, "OBS Virtual Camera", with a sink stream that accepts frames from any
+process. Camera → Send Live View to OBS Virtual Camera feeds it (1920x1080 BGRA, letterboxed); Zoom/Meet/FaceTime
+then pick "OBS Virtual Camera". One-time setup: install OBS, click Start Virtual Camera once, allow the extension in
+System Settings, stop it in OBS. OBS does not need to run afterwards. `Sources/LumixOS/OBSCameraFeed.swift`.
+
 ## Virtual camera ("LumixOS Camera")
 
 `Sources/LumixCamera` is a CoreMediaIO camera extension: Zoom, Meet, FaceTime, OBS and QuickTime see a camera named

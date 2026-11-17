@@ -109,3 +109,13 @@ What we learned building this, including the mistakes, so nobody has to repeat t
 - **No USB video class (webcam) mode**: the S9's USB Mode menu offers Select on connection, PC(Storage), PC(Tether)
   (and LUMIX Lab since 2.x). 0x9707 is "4K/6K Photo cutting get stream", not a video stream. The PTP live view
   (≤1280x960, 30 fps, no audio) is the only video over USB.
+
+## Touch AF (from LUMIX Tether 2.8's libLmxptpif, verified accepted on a DC-S9)
+
+- Op 0x9416 (Rec Ctrl, same as MF drive), data `[u32 code][u32 size][u16 params]`:
+  0x030000A1 AF area start (x, y), 0x030000A2 move (x, y), 0x030000A3 reset, 0x030000A4 end, 0x030000A5 clear.
+  Coordinates 0..1000. Start + End, then AF one-shot (0x9405 0x03000024) = touch AF.
+- GetAFInfo: op 0x9401 param 0x01000010 → sections 0x01000011–0x0100001D (0x01000013 and 0x01000017 start with
+  1000, 1000 = coordinate space). Which section holds the live AF frame is not mapped yet (0x01000013 [10]/[12]/[14]/[15]
+  looked like a frame but didn't follow touches).
+- Aperture: the camera lists every 0.1 f-stop; real steps are the 1/3-stop scale.

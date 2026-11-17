@@ -27,7 +27,7 @@ cat > $APP/Contents/Info.plist <<PLIST
 <key>CFBundleVersion</key><string>2</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>NSHighResolutionCapable</key><true/>
-<key>NSCameraUseContinuityCameraDeviceType</key><true/>
+<key>NSCameraUsageDescription</key><string>LumixOS sends the LUMIX live view into OBS's virtual camera.</string>
 </dict></plist>
 PLIST
 

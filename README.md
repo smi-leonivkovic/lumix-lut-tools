@@ -48,12 +48,15 @@ operations are blocked in the transport. Tests: `python tests/test_offline.py`, 
 `apps/LumixOS` is a SwiftUI app: low-latency live view (1280x960 @ 30 fps, newest frame only) with a camera-style
 HUD over the picture: WB/Kelvin, Photo Style (+ LUT opacity), quality on top; mode, aperture, EV, ISO, shutter,
 remaining shots and battery at the bottom; grid, centre cross, level line, optional histogram. Hover a value to open
-its options, click to set it. Keys: space shutter, f AF, g grid, l level, h histogram, s settings panel.
+its options, click to set it. Focus: AF (f), focus mode AFS/AFC/MF in the HUD, and in MF a focus strip (press to
+nudge, hold to drive), `[` `]` keys (`{` `}` fast) or the scroll wheel. Keys: space shutter, g grid, l level,
+h histogram, s settings panel. **Camera** menu: install the "LumixOS Camera" virtual camera (needs an Apple Developer
+team, see apps/LumixOS/README.md) or copy the stream URL for OBS.
 Errors (no camera, unplugged, camera held by another program, live view refused, service crash) are shown on the
 picture with a Retry button; the app restarts the service if it dies (log: `~/Library/Logs/LumixOS/server.log`).
 
 The app starts `python -m lumix.server` (127.0.0.1:8765; `/stream`, `/stream?raw=1`, `/state`, `/set`, `/af`,
-`/shutter`, `/undo`, `/size`; commands answer `{ok, message|error}`) from this repo's `.venv` (or `LUMIX_REPO`).
+`/shutter`, `/undo`, `/size`, `/focus`; commands answer `{ok, message|error}`) from this repo's `.venv` (or `LUMIX_REPO`).
 Build: `apps/LumixOS/build_app.sh`. A Tk version: `python -m lumix.monitor`.
 The level line assumes LevelInfo (0x17000005) carries roll in 0.1° (not yet verified by tilting).
 

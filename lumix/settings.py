@@ -20,6 +20,7 @@ PROPS = {
     'color_noise': (0x020001F2, 0x020001F2, 2),
     'lut1_on': (0x020001F3, 0x020001F3, 2),
     'lut1_opacity': (0x020001F9, 0x020001F9, 2),
+    'focus_mode': (0x02000071, 0x02000071, 2),  # AFArea_AFModeParam; 0x02000070 reads the same
 }
 
 PHOTO_STYLES = {'standard': 0, 'vivid': 1, 'natural': 2, 'monochrome': 3, 'scenery': 4, 'portrait': 5,
@@ -28,6 +29,7 @@ PHOTO_STYLES = {'standard': 0, 'vivid': 1, 'natural': 2, 'monochrome': 3, 'scene
 WB_MODES = {'auto': 0x0002, 'daylight': 0x0004, 'fluorescent': 0x0005, 'tungsten': 0x0006, 'flash': 0x0007,
             'cloudy': 0x8008, 'white_set': 0x8009, 'shade': 0x800F, 'kelvin': 0x8010, 'kelvin2': 0x8011,
             'kelvin3': 0x8012, 'kelvin4': 0x8013, 'auto_cool': 0x8014, 'auto_warm': 0x8015}
+FOCUS_MODES = {'AFS': 4, 'AFC': 5, 'MF': 3}  # DC-S9: 5 = AFC (camera screen), 3 = MF (MF drive works); 4 assumed AFS
 IMAGE_FORMATS = {'raw': 3, 'raw+jpeg': 4}
 ISO_AUTO = 0xFFFFFFFF
 
@@ -134,6 +136,9 @@ def options(cam):
     out['aperture'] = [(f'f/{v / 10:g}', v) for v in lst('aperture')]
     out['shutter'] = [(shutter_label(v), v) for v in lst('shutter')]
     out['image_format'] = [(n, v) for n, v in IMAGE_FORMATS.items()]
+    fm = set(lst('focus_mode'))
+    out['focus_mode'] = [(n, v) for n, v in FOCUS_MODES.items() if v in fm] + \
+                        [(f'focus {v}', v) for v in sorted(fm) if v not in FOCUS_MODES.values()]
     out['lut1_opacity'] = [(f'{v}%', v) for v in (lst('lut1_opacity') or list(range(10, 101, 10)))]
     out['color_noise'] = [('off', 0), ('on', 1)]
     out['kelvin'] = [(f'{k} K', k) for k in range(2500, 10001, 100)]

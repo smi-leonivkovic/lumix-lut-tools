@@ -10,6 +10,7 @@ GET  /state         JSON: phase (connecting|live|error), status, error, camera (
                     timings, frame_age_ms, hud (battery, shots, mode, shutter, level, histogram), options (labels the camera offers), current values (labels)
 POST /set           JSON {"key": ..., "label": ...}   (labels as listed in /state options)
 POST /af, /shutter, /undo, /size {"size": "1280x960"}
+POST /focus        {"step": near_fast|near_slow|far_slow|far_fast|stop, "ms": 120}  MF drive pulse (focus mode MF)
 Commands wait for the camera (up to 8 s) and answer {"ok": true, "message"} or {"ok": false, "error"} (4xx/5xx).
 Binds to 127.0.0.1 only. Exit code 2 if the port is taken. SIGTERM stops live view cleanly before exiting.
 """
@@ -74,6 +75,7 @@ class CameraService:
         self.fps, self.t_fetch = 0.0, 0.0
         self.camera = None  # {'manufacturer', 'model', 'firmware'} of the connected camera
         self.hud, self.header = {}, {}  # camera-screen values; live view header (histogram, level)
+        self.mf_stop_at = None  # time when a focus drive pulse ends
         self.running = True
         self.stopped = threading.Event()
         threading.Thread(target=self.loop, daemon=True).start()
@@ -93,13 +95,21 @@ class CameraService:
                     self.read_current(cam)
                     if not self.original:
                         self.original = dict(self.current)
-                    liveview.set_size(cam, *self.size)
+                    try:
+                        liveview.set_size(cam, *self.size)
+                    except Exception as e:  # refused in some camera states: keep the camera's current size
+                        if is_link_error(e):
+                            raise
+                        print(f'live view size not set: {e}', file=sys.stderr, flush=True)
                     liveview.start(cam)
                     self.phase, self.status, self.error, delay = 'live', 'live', None, 1.0
                     n, t_fps, t_read = 0, time.time(), time.time()
                     try:
                         while self.running:
                             self.handle_cmds(cam)
+                            if self.mf_stop_at and time.time() >= self.mf_stop_at:
+                                self.mf_stop_at = None
+                                liveview.mf_drive(cam, 'stop')
                             if time.time() - t_read > 2:
                                 self.read_current(cam); t_read = time.time()
                             t0 = time.perf_counter()
@@ -163,6 +173,15 @@ class CameraService:
                         raise
                     failed.append(k)
             return not failed, 'all settings restored' if not failed else 'could not restore: ' + ', '.join(failed)
+        if w[0] == 'focus':
+            step, ms = w[1], w[2]
+            rc = liveview.mf_drive(cam, step)
+            if rc == 0x201D:
+                return False, 'Focus drive needs focus mode MF (set it in the HUD or on the camera).'
+            if rc != 0x2001:
+                return False, f'focus drive refused (0x{rc:04x})'
+            self.mf_stop_at = time.time() + ms / 1000 if step != 'stop' else None
+            return True, f'focus {step.replace("_", " ")}'
         if w[0] == 'set':
             settings.write(cam, w[1], w[2])
             return True, f'{w[1].replace("_", " ")} = {settings.label_of(self.opts, w[1], w[2])}'
@@ -295,6 +314,15 @@ def make_handler(svc):
                     if value is None:
                         return self.send(400, {'ok': False, 'error': f'{key}: camera does not offer {label!r} now'})
                     ok, msg = svc.submit(('set', key, value))
+                elif self.path == '/focus':
+                    step = body.get('step', 'stop')
+                    if step not in liveview.MF_STEPS:
+                        return self.send(400, {'ok': False, 'error': f'step must be one of {", ".join(liveview.MF_STEPS)}'})
+                    try:
+                        ms = max(20, min(int(body.get('ms', 120)), 3000))
+                    except (TypeError, ValueError):
+                        return self.send(400, {'ok': False, 'error': 'ms must be a number'})
+                    ok, msg = svc.submit(('focus', step, ms))
                 elif self.path == '/size':
                     size = body.get('size', '1280x960')
                     if size not in SIZES:

@@ -278,23 +278,29 @@ final class CameraModel: ObservableObject {
         post("set", ["key": key, "label": label])
     }
 
-    func post(_ path: String, _ body: [String: String] = [:]) {
+    func focus(_ step: String, ms: Int = 150) {
+        post("focus", ["step": step, "ms": String(ms)], quiet: true)
+    }
+
+    func post(_ path: String, _ body: [String: String] = [:], quiet: Bool = false) {
         var req = URLRequest(url: serverURL.appendingPathComponent(path))
         req.httpMethod = "POST"
         req.timeoutInterval = 12
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        var json: [String: Any] = body
+        if let ms = body["ms"], let v = Int(ms) { json["ms"] = v }
+        req.httpBody = try? JSONSerialization.data(withJSONObject: json)
         Task {
             do {
                 let (data, r) = try await URLSession.shared.data(for: req)
                 let j = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
                 let code = (r as? HTTPURLResponse)?.statusCode ?? 0
-                if code == 200 { show(j?["message"] as? String ?? "done", error: false) }
+                if code == 200 { if !quiet { show(j?["message"] as? String ?? "done", error: false) } }
                 else { show(j?["error"] as? String ?? "camera service answered HTTP \(code)", error: true) }
             } catch {
                 show("Camera service not reachable: \(error.localizedDescription)", error: true)
             }
-            await refresh()
+            if !quiet { await refresh() }
         }
     }
 
@@ -327,6 +333,7 @@ enum Fmt {
         case "exposure_comp": return ev(label)
         case "iso": return label == "auto" ? "AUTO" : label
         case "lut1_opacity": return label
+        case "focus_mode": return label
         default: return label
         }
     }
@@ -466,7 +473,7 @@ struct OptionColumn: View {
 
 struct CameraHUD: View {
     @ObservedObject var camera: CameraModel
-    @StateObject var hover = HoverMenu()
+    @ObservedObject var hover: HoverMenu
     let size: CGSize
     let showGrid: Bool
     let showLevel: Bool
@@ -494,6 +501,10 @@ struct CameraHUD: View {
                 }
                 .padding(.horizontal, fs * 0.6)
                 Spacer()
+                if cur["focus_mode"] == "MF" {
+                    HStack { Spacer(); focusStrip }.padding(.trailing, fs * 0.6)
+                    Spacer()
+                }
                 bottomBar.zIndex(hover.open?.hasPrefix("bottom") == true ? 2 : 1)
             }
         }
@@ -521,6 +532,11 @@ struct CameraHUD: View {
             }
             item("top.format", [MenuColumn(key: "image_format", title: "Quality")], down: true) {
                 Text(Fmt.value("image_format", cur["image_format"] ?? "—"))
+            }
+            if cur["focus_mode"] != nil {
+                item("top.focus", [MenuColumn(key: "focus_mode", title: "Focus mode")], down: true) {
+                    Text(cur["focus_mode"] ?? "")
+                }
             }
             Spacer()
             item("top.usb", [], down: true) {
@@ -570,6 +586,21 @@ struct CameraHUD: View {
         }
         .padding(.horizontal, fs * 0.6)
         .padding(.bottom, fs * 0.35)
+    }
+
+    /// MF drive: press for a nudge, hold to keep driving. Also [ ] keys ({ } fast) and the scroll wheel.
+    var focusStrip: some View {
+        VStack(spacing: fs * 0.3) {
+            Text("FAR").font(.system(size: fs * 0.55, weight: .bold)).foregroundStyle(.white.opacity(0.7))
+            FocusButton(symbol: "chevron.up.2", step: "far_fast", fs: fs, camera: camera)
+            FocusButton(symbol: "chevron.up", step: "far_slow", fs: fs, camera: camera)
+            FocusButton(symbol: "chevron.down", step: "near_slow", fs: fs, camera: camera)
+            FocusButton(symbol: "chevron.down.2", step: "near_fast", fs: fs, camera: camera)
+            Text("NEAR").font(.system(size: fs * 0.55, weight: .bold)).foregroundStyle(.white.opacity(0.7))
+        }
+        .padding(fs * 0.3)
+        .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: fs * 0.4))
+        .help("Manual focus: press to nudge, hold to drive. Keys [ ] (with shift: fast), or scroll over the picture.")
     }
 
     func boxed(_ s: String) -> some View {
@@ -639,12 +670,41 @@ struct CameraHUD: View {
     }
 }
 
+struct FocusButton: View {
+    let symbol: String
+    let step: String
+    let fs: CGFloat
+    @ObservedObject var camera: CameraModel
+    @State private var timer: Timer?
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: fs * 0.9, weight: .bold))
+            .foregroundStyle(timer == nil ? .white : panasonicYellow)
+            .frame(width: fs * 2, height: fs * 1.6)
+            .background(Color.white.opacity(timer == nil ? 0.08 : 0.25), in: RoundedRectangle(cornerRadius: fs * 0.3))
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    guard timer == nil else { return }
+                    camera.focus(step, ms: 260)
+                    timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { _ in
+                        Task { @MainActor in camera.focus(step, ms: 260) }
+                    }
+                }
+                .onEnded { _ in
+                    timer?.invalidate(); timer = nil
+                    camera.focus("stop")
+                })
+    }
+}
+
 // MARK: - Window
 
 let settingOrder: [(String, String)] = [
     ("photo_style", "Photo Style"), ("lut1_opacity", "LUT opacity"), ("white_balance", "White balance"),
     ("kelvin", "Kelvin"), ("iso", "ISO"), ("exposure_comp", "Exposure comp."), ("aperture", "Aperture"),
-    ("shutter", "Shutter"), ("color_noise", "Colour noise"), ("image_format", "Image format"),
+    ("shutter", "Shutter"), ("focus_mode", "Focus mode"), ("color_noise", "Colour noise"), ("image_format", "Image format"),
 ]
 
 struct ContentView: View {
@@ -655,6 +715,8 @@ struct ContentView: View {
     @State var showGrid = true
     @State var showLevel = true
     @State var showHistogram = false
+    @StateObject var hover = HoverMenu()
+    @State var lastScroll = Date.distantPast
 
     var body: some View {
         GeometryReader { geo in
@@ -672,7 +734,7 @@ struct ContentView: View {
         .frame(minWidth: 560, minHeight: 440)
         .background(Color.black)
         .onAppear { stream.connect(); camera.startPolling() }
-        .background(KeyCatcher(onKey: key))
+        .background(KeyCatcher(onKey: key, onScroll: scroll))
         .toolbar {
             ToolbarItemGroup {
                 Toggle(isOn: $showGrid) { Image(systemName: "grid") }.help("Grid (g)")
@@ -713,7 +775,7 @@ struct ContentView: View {
                                 .frame(width: fit.width, height: fit.height)
                                 .opacity(problem == nil ? 1 : 0.35)
                         }
-                        CameraHUD(camera: camera, size: fit, showGrid: showGrid, showLevel: showLevel, showHistogram: showHistogram)
+                        CameraHUD(camera: camera, hover: hover, size: fit, showGrid: showGrid, showLevel: showLevel, showHistogram: showHistogram)
                         if let p = problem { problemCard(p.text, busy: p.busy) }
                         if let n = camera.notice { noticeView(n, fs: max(11, min(18, fit.width / 55))) }
                     }
@@ -812,6 +874,16 @@ struct ContentView: View {
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
+    /// Scroll wheel over the window drives MF (not while a HUD menu is open: it scrolls the list then).
+    func scroll(_ dy: CGFloat) -> Bool {
+        guard hover.open == nil, camera.state?.current["focus_mode"] == "MF", abs(dy) > 0.5 else { return false }
+        if Date().timeIntervalSince(lastScroll) > 0.08 {
+            lastScroll = Date()
+            camera.focus(dy > 0 ? "far_slow" : "near_slow", ms: min(400, 60 + Int(abs(dy) * 15)))
+        }
+        return true
+    }
+
     func key(_ c: String) {
         switch c.lowercased() {
         case "f": camera.post("af")
@@ -820,6 +892,10 @@ struct ContentView: View {
         case "l": showLevel.toggle()
         case "h": showHistogram.toggle()
         case "s": showPanel.toggle()
+        case "[": camera.focus("near_slow")
+        case "]": camera.focus("far_slow")
+        case "{": camera.focus("near_fast", ms: 200)
+        case "}": camera.focus("far_fast", ms: 200)
         default: break
         }
     }
@@ -827,15 +903,29 @@ struct ContentView: View {
 
 struct KeyCatcher: NSViewRepresentable {
     let onKey: (String) -> Void
+    var onScroll: ((CGFloat) -> Bool)? = nil
     func makeNSView(context: Context) -> NSView {
         let v = KeyView()
         v.onKey = onKey
+        v.onScroll = onScroll
+        v.monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak v] e in
+            guard let v, e.window === v.window, let f = v.onScroll else { return e }
+            return f(e.scrollingDeltaY) ? nil : e
+        }
         DispatchQueue.main.async { v.window?.makeFirstResponder(v) }
         return v
     }
-    func updateNSView(_ v: NSView, context: Context) { (v as? KeyView)?.onKey = onKey }
+    func updateNSView(_ v: NSView, context: Context) {
+        (v as? KeyView)?.onKey = onKey
+        (v as? KeyView)?.onScroll = onScroll
+    }
+    static func dismantleNSView(_ v: NSView, coordinator: ()) {
+        if let m = (v as? KeyView)?.monitor { NSEvent.removeMonitor(m) }
+    }
     final class KeyView: NSView {
         var onKey: ((String) -> Void)?
+        var onScroll: ((CGFloat) -> Bool)?
+        var monitor: Any?
         override var acceptsFirstResponder: Bool { true }
         override func keyDown(with e: NSEvent) {
             if e.modifierFlags.intersection([.command, .control, .option]).isEmpty { onKey?(e.charactersIgnoringModifiers ?? "") }
@@ -851,5 +941,17 @@ struct LumixOSApp: App {
         WindowGroup("LumixOS") { ContentView() }
             .windowResizability(.contentMinSize)
             .defaultSize(width: 1100, height: 860)
+            .commands {
+                CommandMenu("Camera") {
+                    Button("Install LumixOS Camera (for Zoom, Meet, OBS…)") { VirtualCamera.shared.install() }
+                    Button("Remove LumixOS Camera") { VirtualCamera.shared.remove() }
+                    Divider()
+                    Button("Copy Stream URL (OBS Media Source)") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString("http://127.0.0.1:8765/stream", forType: .string)
+                    }
+                    Button("Open Service Log") { Backend.shared.openLog() }
+                }
+            }
     }
 }

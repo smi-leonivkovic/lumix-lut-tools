@@ -97,3 +97,15 @@ What we learned building this, including the mistakes, so nobody has to repeat t
 - Panasonic only offers the newest firmware; update from the SD card (`.bin` on the card root, Setup → Firmware).
   Remove macOS `._` sidecar files from the card so the camera doesn't see a second `.bin`.
 - 2.0 added LUMIX Lab wired connection and LUT extras (grain/colour noise for photos, sharpness, NR).
+
+## Focus and streaming (DC-S9, firmware 2.1)
+
+- **Manual focus works over USB**: ManualFocusDrive 0x9416, param 0x03010011, data `[u32 0x03010011][u32 2][u16 step]`,
+  step 0 stop, 1 far fast, 2 far slow, 3 near slow, 4 near fast (as libgphoto2). The motor runs until `stop`.
+  Only in focus mode MF; otherwise 0x201D.
+- **Focus mode** 0x02000071 (0x02000070 reads the same): allowed 4/5/3; 5 = AFC (camera screen), 3 = MF (verified by
+  MF drive), 4 presumably AFS. AF area mode 0x02000072 (allowed 2, 21, 15, 17, 14, 0; labels not mapped).
+  Focus point position: no USB command found (LUMIX Lab has none either).
+- **No USB video class (webcam) mode**: the S9's USB Mode menu offers Select on connection, PC(Storage), PC(Tether)
+  (and LUMIX Lab since 2.x). 0x9707 is "4K/6K Photo cutting get stream", not a video stream. The PTP live view
+  (≤1280x960, 30 fps, no audio) is the only video over USB.

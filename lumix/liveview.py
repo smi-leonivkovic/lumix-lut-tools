@@ -65,6 +65,17 @@ def autofocus(cam):
     return rc
 
 
+MF_DRIVE, MF_PARAM = 0x9416, 0x03010011
+MF_STEPS = {'stop': 0, 'far_fast': 1, 'far_slow': 2, 'near_slow': 3, 'near_fast': 4}
+
+
+def mf_drive(cam, step):
+    """Drive the focus motor (as libgphoto2 'manualfocusdrive'): keeps moving until 'stop'. Needs focus mode MF,
+    otherwise the camera answers 0x201D."""
+    rc, _, _ = cam.tx(MF_DRIVE, [MF_PARAM], struct.pack('<IIH', MF_PARAM, 2, MF_STEPS[step]), timeout=5000)
+    return rc
+
+
 def shutter(cam):
     """Take a picture to the card (not downloaded)."""
     rc, _, _ = cam.tx(REC_RELEASE, [RELEASE_PHOTO])

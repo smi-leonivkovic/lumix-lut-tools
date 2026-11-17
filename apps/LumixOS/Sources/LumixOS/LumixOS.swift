@@ -492,55 +492,117 @@ struct HUDItem<Label: View>: View {
     }
 
     var menu: some View {
-        HStack(alignment: .top, spacing: 0) {
+        VStack(spacing: fs * 0.2) {
             ForEach(columns) { col in
                 if let opts = camera.state?.options[col.key], !opts.isEmpty {
-                    OptionColumn(column: col, options: opts, current: camera.state?.current[col.key],
-                                 fs: fs, maxHeight: maxMenuHeight) { camera.set(col.key, $0) }
-                    if col.id != columns.last?.id { Divider().background(.white.opacity(0.3)) }
+                    ValueDial(key: col.key, title: col.title, options: opts, current: camera.state?.current[col.key],
+                              fs: fs) { camera.set(col.key, $0) }
                 }
             }
         }
-        .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(.white.opacity(0.25)))
+        .padding(.vertical, fs * 0.35)
+        .padding(.horizontal, fs * 0.3)
+        .background(  // same fading shade as the MF dial
+            LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black.opacity(0.42), location: 0.15),
+                                   .init(color: .black.opacity(0.42), location: 0.85), .init(color: .clear, location: 1)],
+                           startPoint: .leading, endPoint: .trailing),
+            in: RoundedRectangle(cornerRadius: fs * 0.9, style: .continuous))
         .fixedSize()
     }
 }
 
-struct OptionColumn: View {
-    let column: MenuColumn
+/// Horizontal dial in the style of the iOS timer / the MF dial: values on an orange scale under a fixed pointer.
+/// Drag to scroll (a trackpad tick per value, sets on release) or click a value.
+struct ValueDial: View {
+    let key: String
+    let title: String
     let options: [String]
     let current: String?
     let fs: CGFloat
-    let maxHeight: CGFloat
     let pick: (String) -> Void
+    @State private var dragStart: CGFloat?
+    @State private var pos: CGFloat?  // fractional index while dragging
+    @State private var lastTick = 0
+
+    var labels: [String] { options.map { Fmt.value(key, $0) } }
+    var spacing: CGFloat {
+        let longest = CGFloat(labels.map(\.count).max() ?? 3)
+        return max(fs * 2.6, longest * fs * 0.52 + fs * 0.9)
+    }
+    var currentIndex: CGFloat { CGFloat(options.firstIndex(where: { $0 == current }) ?? 0) }
+    var width: CGFloat { min(fs * 19, spacing * CGFloat(min(options.count, 7)) + fs) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(column.title.uppercased()).font(.system(size: fs * 0.62, weight: .bold)).foregroundStyle(.white.opacity(0.55))
-                .padding(.horizontal, 8).padding(.top, 6)
-            ScrollViewReader { proxy in
-                ScrollView(.vertical, showsIndicators: options.count > 12) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(options, id: \.self) { o in
-                            let sel = o == current
-                            Text(Fmt.value(column.key, o) + (column.key == "photo_style" && o != "real_time_lut" ? "" : ""))
-                                .font(.system(size: fs * 0.85, weight: sel ? .bold : .regular, design: .rounded))
-                                .foregroundStyle(sel ? panasonicYellow : .white)
-                                .frame(minWidth: fs * 5, alignment: .leading)
-                                .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(sel ? Color.white.opacity(0.12) : .clear)
-                                .contentShape(Rectangle())
-                                .onTapGesture { pick(o) }
-                                .id(o)
+        let p = pos ?? currentIndex
+        let w = width, sp = spacing
+        VStack(spacing: fs * 0.1) {
+            Text(title.uppercased()).font(.system(size: fs * 0.42, weight: .heavy, design: .rounded))
+                .foregroundStyle(dialOrange.opacity(0.75))
+            ZStack {
+                // ticks: one major per value, two minor between
+                Canvas { ctx, size in
+                    let mid = size.width / 2
+                    let first = Int(floor(p - mid / sp)) - 1, last = Int(ceil(p + mid / sp)) + 1
+                    for i in first...last where i >= 0 && i < options.count {
+                        for k in 0..<3 {
+                            if k > 0 && i == options.count - 1 { break }
+                            let x = mid + (CGFloat(i) + CGFloat(k) / 3 - p) * sp
+                            guard x > -2, x < size.width + 2 else { continue }
+                            var path = Path()
+                            let major = k == 0
+                            path.move(to: CGPoint(x: x, y: size.height * (major ? 0.05 : 0.3)))
+                            path.addLine(to: CGPoint(x: x, y: size.height * 0.95))
+                            ctx.stroke(path, with: .color(dialOrange.opacity(major ? 0.95 : 0.55)),
+                                       style: StrokeStyle(lineWidth: major ? 2 : 1.3, lineCap: .round))
                         }
                     }
                 }
-                .frame(maxHeight: min(maxHeight, CGFloat(options.count) * (fs * 0.85 + 8) + 4))
-                .onAppear { if let c = current { proxy.scrollTo(c, anchor: .center) } }
+                .frame(height: fs * 0.9)
+                .offset(y: fs * 0.55)
+                // value labels (clickable)
+                ForEach(Array(labels.enumerated()), id: \.offset) { i, label in
+                    let x = w / 2 + (CGFloat(i) - p) * sp
+                    if x > -sp, x < w + sp {
+                        let centred = abs(CGFloat(i) - p) < 0.5
+                        Text(label)
+                            .font(.system(size: fs * (centred ? 0.82 : 0.66), weight: centred ? .bold : .semibold, design: .rounded))
+                            .foregroundStyle(dialOrange.opacity(centred ? 1 : 0.7))
+                            .fixedSize()
+                            .position(x: x, y: fs * 0.3)
+                            .onTapGesture { pick(options[i]) }
+                    }
+                }
             }
-            .padding(.bottom, 6)
+            .frame(width: w, height: fs * 1.6)
+            .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.2),
+                                         .init(color: .black, location: 0.8), .init(color: .clear, location: 1)],
+                                 startPoint: .leading, endPoint: .trailing))
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 3)
+                .onChanged { v in
+                    if dragStart == nil { dragStart = currentIndex }
+                    let np = min(max(dragStart! - v.translation.width / sp, 0), CGFloat(options.count - 1))
+                    pos = np
+                    let tick = Int(np.rounded())
+                    if tick != lastTick {
+                        lastTick = tick
+                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                    }
+                }
+                .onEnded { _ in
+                    let i = Int((pos ?? currentIndex).rounded())
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { pos = nil }
+                    dragStart = nil
+                    if options.indices.contains(i), options[i] != current { pick(options[i]) }
+                })
+            Triangle()
+                .fill(dialOrange)
+                .frame(width: fs * 0.42, height: fs * 0.36)
+                .rotationEffect(.degrees(-90))
         }
+        .shadow(color: .black.opacity(0.6), radius: 1.2)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: current)
+        .onAppear { lastTick = Int(currentIndex) }
     }
 }
 
@@ -580,7 +642,6 @@ struct CameraHUD: View {
                     Spacer()
                     FocusRing(fs: fs, height: size.height * 0.26, camera: camera)
                 }
-                .padding(.trailing, fs * 0.45)
                 Spacer()
                 bottomBar.zIndex(hover.open?.hasPrefix("bottom") == true ? 2 : 1)
             }
@@ -766,12 +827,26 @@ struct FocusRing: View {
     @State private var lastSend = Date.distantPast
     @State private var lastMajor = 0
     @State private var grabbed = false
+    @State private var hovering = false
 
     var isMF: Bool { camera.state?.current["focus_mode"] == "MF" }
+    var expanded: Bool { hovering || grabbed }
     var gap: CGFloat { max(5, fs * 0.38) }
 
     var body: some View {
         let w = fs * 1.9
+        // hot zone at the right edge: hovering slides the dial out, otherwise only a sliver of ticks peeks in
+        ZStack(alignment: .trailing) {
+            Color.clear.frame(width: w * 1.9).contentShape(Rectangle())
+            content(width: w)
+                .offset(x: expanded ? 0 : w * 0.62)
+                .opacity(expanded ? 1 : (isMF ? 0.55 : 0.35))
+        }
+        .onHover { h in withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) { hovering = h } }
+        .animation(.spring(response: 0.32, dampingFraction: 0.82), value: grabbed)
+    }
+
+    func content(width w: CGFloat) -> some View {
         VStack(spacing: fs * 0.2) {
             Text("∞").font(.system(size: fs * 0.62, weight: .semibold, design: .rounded))
             dial(width: w)
@@ -792,13 +867,13 @@ struct FocusRing: View {
         .foregroundStyle(dialOrange)
         .shadow(color: .black.opacity(0.6), radius: 1.5)
         .padding(.vertical, fs * 0.5)
-        .padding(.horizontal, fs * 0.15)
-        .background(  // soft shade that fades out at both ends, so the picture shows through
+        .padding(.leading, fs * 0.2)
+        .padding(.trailing, fs * 0.1)
+        .background(  // soft shade that fades out at both ends, flush with the right edge
             LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black.opacity(0.32), location: 0.2),
                                    .init(color: .black.opacity(0.32), location: 0.8), .init(color: .clear, location: 1)],
                            startPoint: .top, endPoint: .bottom),
-            in: Capsule())
-        .opacity(grabbed || isMF ? 1 : 0.75)
+            in: UnevenRoundedRectangle(topLeadingRadius: fs, bottomLeadingRadius: fs, style: .continuous))
         .animation(.easeOut(duration: 0.2), value: isMF)
         .help("MF dial: drag up for far, down for near (faster = faster). Grabbing it switches the camera to MF. "
               + "Also [ ] keys ({ } fast) and the scroll wheel.")

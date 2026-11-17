@@ -826,7 +826,10 @@ struct FocusRing: View {
     @State private var grabbed = false
     @State private var hovering = false
 
+    @AppStorage("lastAFMode") private var lastAF = "AFC"  // AF mode to return to from MF
+
     var isMF: Bool { camera.state?.current["focus_mode"] == "MF" }
+    var focusMode: String { camera.state?.current["focus_mode"] ?? "MF" }
     var expanded: Bool { hovering || grabbed }
     var gap: CGFloat { max(5, fs * 0.38) }
 
@@ -840,6 +843,7 @@ struct FocusRing: View {
                 .opacity(expanded ? 1 : (isMF ? 0.8 : 0.55))
         }
         .onHover { h in withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) { hovering = h } }
+        .onChange(of: focusMode) { _, m in if m != "MF", m.hasPrefix("AF") { lastAF = m } }
         .animation(.spring(response: 0.32, dampingFraction: 0.82), value: grabbed)
     }
 
@@ -849,9 +853,9 @@ struct FocusRing: View {
             dial(width: w)
             Text("NEAR").font(.system(size: fs * 0.38, weight: .bold, design: .rounded)).opacity(expanded ? 1 : 0)
             Button {
-                camera.set("focus_mode", isMF ? "AFC" : "MF")
+                camera.set("focus_mode", isMF ? lastAF : "MF")
             } label: {
-                Text("MF")
+                Text(focusMode)
                     .font(.system(size: fs * 0.48, weight: .bold, design: .rounded))
                     .padding(.horizontal, fs * 0.4).padding(.vertical, fs * 0.12)
                     .background(dialOrange.opacity(isMF ? 0.28 : 0.1), in: Capsule())
@@ -860,7 +864,7 @@ struct FocusRing: View {
             .buttonStyle(.plain)
             .padding(.top, fs * 0.15)
             .opacity(expanded ? 1 : 0)
-            .help(isMF ? "Back to AFC" : "Manual focus")
+            .help(isMF ? "Back to \(lastAF)" : "Manual focus")
         }
         .foregroundStyle(dialOrange)
         .shadow(color: .black.opacity(0.35), radius: 4)

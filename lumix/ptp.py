@@ -20,7 +20,7 @@ VID = 0x04DA
 KNOWN_PRODUCTS = {0x2382: 'PC (Tether)', 0x2387: 'LUMIX Lab'}
 FORBIDDEN_OPS = {0x9606, 0x9607}  # LumixSendDataInfo / LumixSendData: firmware update channel
 STD_PROP_OPS = {0x1014, 0x1015, 0x1016}  # standard Get/SetDevicePropDesc/Value
-STD_PROPS_OK = {0x5001}  # the only standard property a DC-S9 lists; others (e.g. 0x500E) hang its USB stack
+STD_PROPS_OK = {0x5001}  # the only standard property a DC-S9 lists; 0x500E got no answer (link unresponsive until replug)
 OK = 0x2001
 LOCK = threading.RLock()
 
@@ -105,8 +105,9 @@ class Camera:
         if code in FORBIDDEN_OPS:
             raise CameraError(f'Operation 0x{code:04x} is the firmware channel and is blocked.')
         if code in STD_PROP_OPS and (not params or params[0] not in STD_PROPS_OK):
-            warnings.warn('Standard PTP property 0x%04x is not listed by the camera; on a DC-S9 this request hung the '
-                          'USB connection until replug.' % (params[0] if params else 0), RuntimeWarning, stacklevel=2)
+            warnings.warn('Standard PTP property 0x%04x is not listed by the camera; on a DC-S9 such a request got no '
+                          'answer and the USB link stayed unresponsive until replug.' % (params[0] if params else 0),
+                          RuntimeWarning, stacklevel=2)
         self.tid += 1
         self.out.write(struct.pack('<IHHI', 12 + 4 * len(params), 1, code, self.tid)
                        + b''.join(struct.pack('<I', p) for p in params), timeout=5000)

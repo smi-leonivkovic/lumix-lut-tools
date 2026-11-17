@@ -578,9 +578,9 @@ struct CameraHUD: View {
                 Spacer()
                 HStack {
                     Spacer()
-                    FocusRing(fs: fs, height: size.height * 0.38, camera: camera)
+                    FocusRing(fs: fs, height: size.height * 0.26, camera: camera)
                 }
-                .padding(.trailing, fs * 0.7)
+                .padding(.trailing, fs * 0.45)
                 Spacer()
                 bottomBar.zIndex(hover.open?.hasPrefix("bottom") == true ? 2 : 1)
             }
@@ -768,36 +768,38 @@ struct FocusRing: View {
     @State private var grabbed = false
 
     var isMF: Bool { camera.state?.current["focus_mode"] == "MF" }
-    var gap: CGFloat { max(6, fs * 0.5) }
+    var gap: CGFloat { max(5, fs * 0.38) }
 
     var body: some View {
-        let w = fs * 3.1
-        VStack(spacing: fs * 0.5) {
-            VStack(spacing: fs * 0.25) {
-                Text("∞").font(.system(size: fs * 0.85, weight: .semibold, design: .rounded))
-                    .foregroundStyle(dialOrange.opacity(0.9))
-                dial(width: w)
-                Text("NEAR").font(.system(size: fs * 0.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(dialOrange.opacity(0.9))
-            }
-            .padding(.vertical, fs * 0.6)
-            .padding(.horizontal, fs * 0.35)
-            .background(Color.black.opacity(0.92), in: RoundedRectangle(cornerRadius: fs * 1.3, style: .continuous))
-            .shadow(color: .black.opacity(0.35), radius: 8, y: 2)
-
+        let w = fs * 1.9
+        VStack(spacing: fs * 0.2) {
+            Text("∞").font(.system(size: fs * 0.62, weight: .semibold, design: .rounded))
+            dial(width: w)
+            Text("NEAR").font(.system(size: fs * 0.38, weight: .bold, design: .rounded))
             Button {
                 camera.set("focus_mode", isMF ? "AFC" : "MF")
             } label: {
                 Text("MF")
-                    .font(.system(size: fs * 0.72, weight: .semibold, design: .rounded))
-                    .foregroundStyle(isMF ? dialOrange : dialOrange.opacity(0.55))
-                    .padding(.horizontal, fs * 0.8).padding(.vertical, fs * 0.3)
-                    .background(dialOrange.opacity(isMF ? 0.22 : 0.08), in: Capsule())
-                    .background(Color.black.opacity(0.85), in: Capsule())
+                    .font(.system(size: fs * 0.48, weight: .bold, design: .rounded))
+                    .padding(.horizontal, fs * 0.4).padding(.vertical, fs * 0.12)
+                    .background(dialOrange.opacity(isMF ? 0.28 : 0.1), in: Capsule())
+                    .opacity(isMF ? 1 : 0.6)
             }
             .buttonStyle(.plain)
+            .padding(.top, fs * 0.15)
             .help(isMF ? "Back to AFC" : "Manual focus")
         }
+        .foregroundStyle(dialOrange)
+        .shadow(color: .black.opacity(0.6), radius: 1.5)
+        .padding(.vertical, fs * 0.5)
+        .padding(.horizontal, fs * 0.15)
+        .background(  // soft shade that fades out at both ends, so the picture shows through
+            LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black.opacity(0.32), location: 0.2),
+                                   .init(color: .black.opacity(0.32), location: 0.8), .init(color: .clear, location: 1)],
+                           startPoint: .top, endPoint: .bottom),
+            in: Capsule())
+        .opacity(grabbed || isMF ? 1 : 0.75)
+        .animation(.easeOut(duration: 0.2), value: isMF)
         .help("MF dial: drag up for far, down for near (faster = faster). Grabbing it switches the camera to MF. "
               + "Also [ ] keys ({ } fast) and the scroll wheel.")
     }
@@ -813,11 +815,11 @@ struct FocusRing: View {
                     if y > size.height + g { break }
                     if y >= -g {
                         let major = i % 5 == 0
-                        let len = major ? size.width * 0.62 : size.width * 0.42
+                        let len = major ? size.width * 0.7 : size.width * 0.45
                         var p = Path()
                         p.move(to: CGPoint(x: size.width - len, y: y)); p.addLine(to: CGPoint(x: size.width - 4, y: y))
                         ctx.stroke(p, with: .color(dialOrange.opacity(major ? 1 : 0.7)),
-                                   style: StrokeStyle(lineWidth: major ? 3 : 2.2, lineCap: .round))
+                                   style: StrokeStyle(lineWidth: major ? 2 : 1.3, lineCap: .round))
                     }
                     i += 1
                 }
@@ -828,7 +830,7 @@ struct FocusRing: View {
             // fixed pointer
             Triangle()
                 .fill(dialOrange)
-                .frame(width: fs * 0.55, height: fs * 0.6)
+                .frame(width: fs * 0.38, height: fs * 0.42)
                 .offset(x: 1)
         }
         .frame(width: w, height: height)
